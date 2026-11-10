@@ -10,8 +10,8 @@ pub fn update(world: *ecs.World) void {
     const position = world.get(player, component.Position).?;
 
     var query = world.query(.{Trigger});
-    while (query.next()) |entity| {
-        const trigger = query.get(entity, Trigger);
+    while (query.next()) |row| {
+        const trigger = row.get(Trigger);
         if (trigger.rect.contains(position)) {
             world.add(player, Transition{
                 .target = trigger.targetMap,

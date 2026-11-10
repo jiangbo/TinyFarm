@@ -52,20 +52,20 @@ pub fn update(world: *ecs.World) void {
     world.clear(Disabled);
     if (clock.isDark()) {
         var query = world.query(.{Day});
-        while (query.next()) |e| query.add(world, e, Disabled{});
+        while (query.next()) |row| query.add(world, row.entity, Disabled{});
     } else {
         var query = world.query(.{Night});
-        while (query.next()) |e| query.add(world, e, Disabled{});
+        while (query.next()) |row| query.add(world, row.entity, Disabled{});
     }
 }
 
 fn updatePending(world: *ecs.World, dark: bool) void {
     // 新生成的灯光只同步一次初始昼夜状态。
     var query = world.query(.{Pending});
-    while (query.next()) |entity| {
-        const enabled = if (dark) world.has(entity, Night) //
-            else world.has(entity, Day);
-        if (enabled) world.remove(entity, Disabled);
+    while (query.next()) |row| {
+        const enabled = if (dark) world.has(row.entity, Night) //
+            else world.has(row.entity, Day);
+        if (enabled) world.remove(row.entity, Disabled);
     }
     world.clear(Pending);
 }
@@ -90,9 +90,9 @@ fn drawOverlay(hourValue: u8, minute: f32) void {
 fn drawLights(world: *ecs.World) void {
     const allPoint = .{ Position, Point };
     var points = world.queryNot(allPoint, .{Disabled});
-    while (points.next()) |entity| {
-        const position = points.get(entity, Position);
-        const point = points.get(entity, Point);
+    while (points.next()) |row| {
+        const position = row.get(Position);
+        const point = row.get(Point);
         const center = position.add(point.offset);
         const alpha = std.math.clamp(point.intensity, 0, 1);
         const color = point.color.scaleAlpha(0.68 * alpha);
@@ -102,9 +102,9 @@ fn drawLights(world: *ecs.World) void {
     const allSpot = .{ Position, Spot };
     // 第一版不做真实锥形，先退化成圆形占位光圈验证地图数据。
     var spots = world.queryNot(allSpot, .{Disabled});
-    while (spots.next()) |entity| {
-        const pos = spots.get(entity, Position);
-        const spot = spots.get(entity, Spot);
+    while (spots.next()) |row| {
+        const pos = row.get(Position);
+        const spot = row.get(Spot);
         const alpha = std.math.clamp(spot.intensity, 0, 1);
         const color = spot.color.scaleAlpha(0.56 * alpha);
         drawGlow(pos, spot.radius * 1.6, color);

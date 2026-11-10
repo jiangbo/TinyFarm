@@ -45,7 +45,7 @@ fn drawDebug() void {
     const rows = [_]zhu.extend.debug.Row{.{
         .label = "世界",
         .left = zhu.format(&entityBuffer, "实体 {}/{}", .{
-            total - scene.world.entities.deletedCount,
+            total - scene.world.entities.deleted.items.len,
             total,
         }),
         .right = zhu.format(&componentBuffer, "组件 {}", .{

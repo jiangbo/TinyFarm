@@ -11,9 +11,9 @@ const Hidden = component.render.Hidden;
 
 pub fn update(world: *ecs.World) void {
     var query = world.query(.{ Render, Position, YSort });
-    while (query.next()) |entity| {
-        const position = query.get(entity, Position);
-        query.getPtr(entity, Render).depth = position.y;
+    while (query.next()) |row| {
+        const position = row.get(Position);
+        row.getPtr(Render).depth = position.y;
     }
 }
 
@@ -22,10 +22,10 @@ pub fn draw(world: *ecs.World) void {
 
     const viewport = zhu.camera.mainWorldRect();
     var query = world.queryBy(Render, .{ Position, Sprite }, .{Hidden});
-    while (query.next()) |entity| {
-        const render = query.get(entity, Render);
-        const position = query.get(entity, Position);
-        const sprite = query.get(entity, Sprite);
+    while (query.next()) |row| {
+        const render = row.get(Render);
+        const position = row.get(Position);
+        const sprite = row.get(Sprite);
 
         const spriteSize = sprite.size orelse sprite.image.size;
         const spritePosition = position.add(sprite.offset);

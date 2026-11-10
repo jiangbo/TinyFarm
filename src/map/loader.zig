@@ -291,10 +291,10 @@ test "actor 点对象会生成 NPC，player 点对象只保留标记" {
         actor.Wander,
         actor.Dialog,
     });
-    const entity = query.next().?;
-    const position = query.get(entity, Position);
-    const wander = query.get(entity, actor.Wander);
-    const dialog = query.get(entity, actor.Dialog);
+    const row = query.next().?;
+    const position = row.get(Position);
+    const wander = row.get(actor.Wander);
+    const dialog = row.get(actor.Dialog);
 
     try std.testing.expectEqual(95, position.x);
     try std.testing.expectEqual(274, position.y);
@@ -314,8 +314,8 @@ test "trigger 对象会创建 ECS 触发器实体" {
     defer loaded.vertexes.clearAndFree(std.testing.allocator);
 
     var query = world.query(.{component.map.Trigger});
-    const entity = query.next().?;
-    const trigger = query.get(entity, component.map.Trigger);
+    const row = query.next().?;
+    const trigger = row.get(component.map.Trigger);
 
     try std.testing.expectEqual(2, trigger.selfId);
     try std.testing.expectEqual(3, trigger.targetId);
@@ -341,11 +341,11 @@ test "rest 对象会创建可交互实体" {
         component.map.Rest,
         motion.Shape,
     });
-    const entity = query.next().?;
-    const shape = query.get(entity, motion.Shape);
+    const row = query.next().?;
+    const shape = row.get(motion.Shape);
 
-    try std.testing.expectEqual(10, query.get(entity, Position).x);
-    try std.testing.expectEqual(20, query.get(entity, Position).y);
+    try std.testing.expectEqual(10, row.get(Position).x);
+    try std.testing.expectEqual(20, row.get(Position).y);
     try std.testing.expectEqual(30, shape.rect.size.x);
     try std.testing.expectEqual(40, shape.rect.size.y);
     try std.testing.expectEqual(null, query.next());

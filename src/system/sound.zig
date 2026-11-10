@@ -22,9 +22,9 @@ fn playEvents(world: *ecs.World) void {
 
 fn playEntities(world: *ecs.World) void {
     var query = world.query(.{ Position, Id, Emit });
-    while (query.next()) |entity| {
-        const position = query.get(entity, Position);
-        const id = query.get(entity, Id);
+    while (query.next()) |row| {
+        const position = row.get(Position);
+        const id = row.get(Id);
         const viewport = zhu.camera.mainWorldRect();
         if (!viewport.contains(position)) continue;
 

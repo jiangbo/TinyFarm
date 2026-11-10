@@ -14,9 +14,9 @@ pub fn update(world: *ecs.World, delta: f32) void {
     updateActor(world);
 
     var query = world.query(.{ Animation, Sprite });
-    while (query.next()) |entity| {
-        const animation = query.getPtr(entity, Animation);
-        const sprite = query.getPtr(entity, Sprite);
+    while (query.next()) |row| {
+        const animation = row.getPtr(Animation);
+        const sprite = row.getPtr(Sprite);
 
         switch (animation.update(delta) orelse continue) {
             .next, .loop => {
@@ -24,18 +24,18 @@ pub fn update(world: *ecs.World, delta: f32) void {
                 if (animation.frame().extend == 0) continue;
 
                 // extend 非零表示这一帧是动作生效点，具体效果由 farm 系统处理。
-                query.add(world, entity, UseFrame{});
+                query.add(world, row.entity, UseFrame{});
             },
             .end => {
-                if (!world.has(entity, Busy)) continue;
+                if (!world.has(row.entity, Busy)) continue;
 
                 // 工具动画完整播放后恢复待机，下一帧控制系统才能再次接管。
-                world.remove(entity, Busy);
-                const actor = world.getPtr(entity, Actor).?;
+                world.remove(row.entity, Busy);
+                const actor = world.getPtr(row.entity, Actor).?;
                 actor.action = .idle;
 
-                const row = actorRow(actor, sprite);
-                playActor(animation, .idle, row, true);
+                const frameRow = actorRow(actor, sprite);
+                playActor(animation, .idle, frameRow, true);
                 sprite.image = animation.subImage();
             },
         }
@@ -44,20 +44,20 @@ pub fn update(world: *ecs.World, delta: f32) void {
 
 fn updateActor(world: *ecs.World) void {
     var query = world.query(.{ Actor, Animation, Sprite });
-    while (query.next()) |entity| {
-        const actor = query.getPtr(entity, Actor);
-        const animation = query.getPtr(entity, Animation);
-        const sprite = query.getPtr(entity, Sprite);
+    while (query.next()) |row| {
+        const actor = row.getPtr(Actor);
+        const animation = row.getPtr(Animation);
+        const sprite = row.getPtr(Sprite);
 
-        const row = actorRow(actor, sprite);
+        const frameRow = actorRow(actor, sprite);
         const index = zhu.toIndex(u8, actor.action);
         const sameAction = animation.sourceIndex == index;
-        if (sameAction and animation.row == row) continue;
+        if (sameAction and animation.row == frameRow) continue;
 
         const loop = actor.action == .idle or
             actor.action == .walk or actor.action == .sleep or
             actor.action == .eat;
-        playActor(animation, actor.action, row, loop);
+        playActor(animation, actor.action, frameRow, loop);
     }
 }
 

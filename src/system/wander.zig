@@ -21,24 +21,24 @@ const arriveDistance2: f32 = 4.0;
 pub fn update(world: *ecs.World, delta: f32) void {
     const talking = world.getIdentityEntity(Dialog);
     var query = world.query(.{ Position, Velocity, Actor, Wander });
-    while (query.next()) |entity| {
-        const position = query.get(entity, Position);
-        const velocity = query.getPtr(entity, Velocity);
-        const actor = query.getPtr(entity, Actor);
-        const wander = query.getPtr(entity, Wander);
+    while (query.next()) |row| {
+        const position = row.get(Position);
+        const velocity = row.getPtr(Velocity);
+        const actor = row.getPtr(Actor);
+        const wander = row.getPtr(Wander);
 
-        if (world.getPtr(entity, Voice)) |voice| {
+        if (world.getPtr(row.entity, Voice)) |voice| {
             voice.remaining = @max(0, voice.remaining - delta);
         }
 
         // 只停止正在对话的 NPC，其他 NPC 继续正常漫游。
-        if (talking == entity) {
+        if (talking == row.entity) {
             stop(actor, velocity, wander);
             continue;
         }
 
         // 睡觉和进食由生活系统控制，漫游只负责让出移动权。
-        if (world.get(entity, Life)) |life| {
+        if (world.get(row.entity, Life)) |life| {
             if (life.state != .normal) {
                 velocity.value = .zero;
                 wander.moving = false;
@@ -76,7 +76,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
         // 距离足够近，视为已到达
         if (distance2 <= arriveDistance2) {
             stop(actor, velocity, wander);
-            tryEmitVoice(world, entity);
+            tryEmitVoice(world, row.entity);
             wander.waitTimer = zhu.random.float(wander.minWait, wander.maxWait);
             continue;
         }
@@ -274,7 +274,7 @@ test "对话中的 NPC 会停止漫游且不影响其它 NPC" {
         .target = .xy(30, 20),
         .moving = true,
     });
-    world.addIdentity(talking, Dialog);
+    world.setIdentity(talking, Dialog);
 
     const other = world.createEntity();
     world.add(other, Position.xy(0, 0));
@@ -316,7 +316,7 @@ test "wander 对话停止不会挂发声标记" {
         .moving = true,
     });
     world.add(entity, Voice{ .probability = 1, .coolDown = 6 });
-    world.addIdentity(entity, Dialog);
+    world.setIdentity(entity, Dialog);
 
     update(&world, 0.1);
 

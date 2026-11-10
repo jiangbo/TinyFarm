@@ -32,17 +32,17 @@ pub fn update(world: *World) void {
     var bestDist2: f32 = std.math.inf(f32);
 
     var query = world.query(.{ Hit, Interact, Position });
-    while (query.next()) |entity| {
-        const pos = targetCenter(world, entity);
+    while (query.next()) |row| {
+        const pos = targetCenter(world, row.entity);
         const dist2 = playerPos.sub(pos).length2();
         if (dist2 < bestDist2) {
             bestDist2 = dist2;
-            bestEntity = entity;
+            bestEntity = row.entity;
         }
     }
 
     const target = bestEntity orelse return;
-    world.addIdentity(target, Interact);
+    world.setIdentity(target, Interact);
 }
 
 /// 标记玩家正前方探测框范围内所有实体的 Hit 组件。
@@ -63,11 +63,11 @@ fn markFacingHits(world: *World) void {
     const rect = zhu.Rect.init(origin, .all(probeSize));
 
     var query = world.query(.{ Position, Shape });
-    while (query.next()) |entity| {
-        const position = query.get(entity, Position);
-        const body = query.get(entity, Shape);
+    while (query.next()) |row| {
+        const position = row.get(Position);
+        const body = row.get(Shape);
         if (body.move(position).intersect(rect)) {
-            query.add(world, entity, Hit{});
+            query.add(world, row.entity, Hit{});
         }
     }
 }
@@ -132,7 +132,7 @@ test "interact 对话中不会重新寻找目标" {
     _ = addTestPlayer(&world, .xy(0, 0));
     const talking = addTestNpc(&world, .xy(0, 10));
     const target = addTestNpc(&world, .xy(0, 10));
-    world.addIdentity(talking, Dialog);
+    world.setIdentity(talking, Dialog);
 
     zhu.key.set(.F, true);
     update(&world);
@@ -150,7 +150,7 @@ test "interact 下一帧会清理上一次交互目标" {
     defer world.deinit();
 
     const target = world.createEntity();
-    world.addIdentity(target, Interact);
+    world.setIdentity(target, Interact);
 
     update(&world);
 

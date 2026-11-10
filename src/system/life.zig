@@ -21,24 +21,24 @@ pub fn update(world: *ecs.World, delta: f32) void {
 
 fn updateSleep(world: *ecs.World) void {
     var query = world.query(.{ Actor, Life });
-    while (query.next()) |entity| {
-        const actor = query.getPtr(entity, Actor);
-        const life = query.getPtr(entity, Life);
+    while (query.next()) |row| {
+        const actor = row.getPtr(Actor);
+        const life = row.getPtr(Life);
 
         // 夜晚睡觉优先于进食，直接停住并跳过后续生活逻辑。
         life.state = .sleep;
         life.timer = 0;
         faceFront(actor);
         actor.action = .sleep;
-        stopMoving(world, entity);
+        stopMoving(world, row.entity);
     }
 }
 
 fn updateDay(world: *ecs.World, delta: f32) void {
     var query = world.query(.{ Actor, Life });
-    while (query.next()) |entity| {
-        const actor = query.getPtr(entity, Actor);
-        const life = query.getPtr(entity, Life);
+    while (query.next()) |row| {
+        const actor = row.getPtr(Actor);
+        const life = row.getPtr(Life);
 
         // 离开夜晚后恢复普通状态，并重新安排下一次进食。
         if (life.state == .sleep) {
@@ -58,14 +58,14 @@ fn updateDay(world: *ecs.World, delta: f32) void {
                 life.timer = zhu.random.float(duration * 0.5, duration);
                 faceFront(actor);
                 actor.action = .eat;
-                stopMoving(world, entity);
+                stopMoving(world, row.entity);
             },
             .eat => {
                 // 进食期间持续保持动作并停止移动。
                 life.timer -= delta;
                 faceFront(actor);
                 actor.action = .eat;
-                stopMoving(world, entity);
+                stopMoving(world, row.entity);
                 if (life.timer > 0) continue;
 
                 // 进食结束后回到普通状态，等待下一次进食。

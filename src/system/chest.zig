@@ -112,7 +112,7 @@ test "chest 交互会打开宝箱并移除碰撞" {
     const inv = addTestInventory(&world);
 
     const chest = addTestChest(&world, .potato, 2);
-    world.addIdentity(chest, Interact);
+    world.setIdentity(chest, Interact);
 
     update(&world);
 
@@ -138,7 +138,7 @@ test "chest 背包满时奖励留在宝箱里" {
     }
 
     const chest = addTestChest(&world, .potato, 2);
-    world.addIdentity(chest, Interact);
+    world.setIdentity(chest, Interact);
 
     update(&world);
 

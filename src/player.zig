@@ -47,8 +47,8 @@ pub fn restore(world: *World, data: storage.Player) void {
 
 fn spawnPosition(world: *World, targetId: i32) zhu.Vector2 {
     var query = world.query(.{Trigger});
-    while (query.next()) |entity| {
-        const trigger = query.get(entity, Trigger);
+    while (query.next()) |row| {
+        const trigger = row.get(Trigger);
         if (trigger.selfId == targetId) return triggerPosition(trigger);
     }
 

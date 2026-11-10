@@ -55,7 +55,7 @@ fn startDialog(world: *World, target: Entity) void {
 
     dialog.index = 0;
     facePlayer(world, target);
-    world.addIdentity(target, Dialog);
+    world.setIdentity(target, Dialog);
 }
 
 fn facePlayer(world: *World, target: Entity) void {
@@ -148,7 +148,7 @@ test "dialog 消费交互标记并开始对话" {
 
     _ = addTestPlayer(&world, .xy(0, 0));
     const npc = addTestNpc(&world, .xy(0, 10));
-    world.addIdentity(npc, Interact);
+    world.setIdentity(npc, Interact);
 
     update(&world);
 
@@ -168,7 +168,7 @@ test "dialog 对话中按交互键会推进并关闭" {
     _ = addTestPlayer(&world, .xy(0, 0));
     const npc = addTestNpc(&world, .xy(0, 10));
     world.getPtr(npc, Dialog).?.lines = &.{"你好"};
-    world.addIdentity(npc, Dialog);
+    world.setIdentity(npc, Dialog);
 
     zhu.key.set(.F, true);
     update(&world);
@@ -183,7 +183,7 @@ test "dialog 距离过远会关闭对话" {
 
     _ = addTestPlayer(&world, .xy(0, 0));
     const npc = addTestNpc(&world, .xy(0, 128));
-    world.addIdentity(npc, Dialog);
+    world.setIdentity(npc, Dialog);
 
     update(&world);
 

@@ -15,21 +15,21 @@ const Entity = ecs.Entity;
 
 pub fn update(world: *World, delta: f32) void {
     var query = world.query(.{ Position, Velocity });
-    while (query.next()) |entity| {
-        const velocity = query.get(entity, Velocity);
+    while (query.next()) |row| {
+        const velocity = row.get(Velocity);
         if (velocity.value.approxEqual(.zero)) continue;
 
-        const pos = query.getPtr(entity, Position);
+        const pos = row.getPtr(Position);
         const offset = velocity.value.scale(delta);
 
         // 轴分离碰撞解析：先尝试 X 轴移动，再尝试 Y 轴移动。
         // 碰撞时只回退受阻轴，这样可以沿墙滑动而不会卡死。
         const posX = pos.addX(offset.x);
-        if (map.canMove(world, entity, posX)) pos.* = posX;
+        if (map.canMove(world, row.entity, posX)) pos.* = posX;
 
         // Y 轴基于 X 轴已接受的位置继续检测，保持斜向移动和滑动。
         const posY = pos.addY(offset.y);
-        if (map.canMove(world, entity, posY)) pos.* = posY;
+        if (map.canMove(world, row.entity, posY)) pos.* = posY;
     }
 
     followPlayer(world, delta);

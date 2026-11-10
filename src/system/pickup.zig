@@ -25,11 +25,11 @@ pub fn update(world: *World, delta: f32) void {
     const notice = world.getResourcePtr(Notice).?;
 
     var query = world.query(.{ Pickup, Position, Shape }).reverse();
-    while (query.next()) |entity| {
-        if (world.has(entity, PickupMotion)) continue;
+    while (query.next()) |row| {
+        if (world.has(row.entity, PickupMotion)) continue;
 
-        const pickup = query.getPtr(entity, Pickup);
-        const pickupShape = worldShape(world, entity) orelse continue;
+        const pickup = row.getPtr(Pickup);
+        const pickupShape = worldShape(world, row.entity) orelse continue;
         if (!playerShape.intersect(pickupShape)) continue;
 
         const inv = world.getResourcePtr(Inventory).?;
@@ -54,16 +54,16 @@ pub fn update(world: *World, delta: f32) void {
         if (len > 0) notice.show("{s}", .{buffer[0..len]});
         if (remaining > 0) continue;
 
-        world.destroyEntity(entity);
+        world.destroyEntity(row.entity);
         world.addEvent(event.SoundPlay{ .id = .pickup });
     }
 }
 
 fn updateMotion(world: *World, delta: f32) void {
     var query = world.query(.{ PickupMotion, Position });
-    while (query.next()) |entity| {
-        const motion = query.getPtr(entity, PickupMotion);
-        const pos = query.getPtr(entity, Position);
+    while (query.next()) |row| {
+        const motion = row.getPtr(PickupMotion);
+        const pos = row.getPtr(Position);
 
         const running = motion.timer.updateRunning(delta);
         const t = motion.timer.progress();
@@ -76,7 +76,7 @@ fn updateMotion(world: *World, delta: f32) void {
 
         if (running) continue;
         pos.* = motion.target;
-        world.remove(entity, PickupMotion);
+        world.remove(row.entity, PickupMotion);
     }
 }
 

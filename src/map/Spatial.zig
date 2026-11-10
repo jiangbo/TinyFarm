@@ -179,11 +179,11 @@ pub fn canMove(self: Spatial, world: *World, entity: Entity, to: zhu.Vector2) bo
 
     const moved = body.move(to);
     var query = world.query(.{ Position, Shape, Blocking });
-    while (query.next()) |other| {
-        if (other == entity) continue;
+    while (query.next()) |row| {
+        if (row.entity == entity) continue;
 
-        const otherPosition = query.get(other, Position);
-        const otherBody = query.get(other, Shape);
+        const otherPosition = row.get(Position);
+        const otherBody = row.get(Shape);
         const otherShape = otherBody.move(otherPosition);
         if (moved.intersect(otherShape)) return false;
     }
