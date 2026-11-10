@@ -426,8 +426,8 @@ test "湿地离线跨天只加速一天" {
 }
 
 test "当前地图跨天推进作物后刷新贴图和渲染层" {
-    loaded.land = Land.init(zhu.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(zhu.testing.allocator);
+    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
+    defer loaded.land.deinit(std.testing.allocator);
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
@@ -463,8 +463,8 @@ test "当前地图跨天推进作物后刷新贴图和渲染层" {
 }
 
 test "当前地图和离线地图跨天推进规则一致" {
-    loaded.land = Land.init(zhu.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(zhu.testing.allocator);
+    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
+    defer loaded.land.deinit(std.testing.allocator);
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
@@ -510,8 +510,8 @@ test "当前地图和离线地图跨天推进规则一致" {
 }
 
 test "恢复已打开宝箱会移除动画组件" {
-    loaded.land = Land.init(zhu.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(zhu.testing.allocator);
+    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
+    defer loaded.land.deinit(std.testing.allocator);
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
@@ -539,8 +539,8 @@ test "恢复已打开宝箱会移除动画组件" {
 }
 
 test "恢复地图产出对象只写回生命" {
-    loaded.land = Land.init(zhu.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(zhu.testing.allocator);
+    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
+    defer loaded.land.deinit(std.testing.allocator);
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
@@ -560,10 +560,10 @@ test "恢复地图产出对象只写回生命" {
 }
 
 test "恢复 gone 会删除默认产出对象并清 tile 阻挡" {
-    loaded.land = Land.init(zhu.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(zhu.testing.allocator);
-    loaded.spatial = Spatial.init(zhu.testing.allocator, maps[0].grid);
-    defer loaded.spatial.deinit(zhu.testing.allocator);
+    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
+    defer loaded.land.deinit(std.testing.allocator);
+    loaded.spatial = Spatial.init(std.testing.allocator, maps[0].grid);
+    defer loaded.spatial.deinit(std.testing.allocator);
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
@@ -657,9 +657,9 @@ test "对象层产出对象按碰撞范围占用格子" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    loaded = loader.load(zhu.testing.allocator, &world, testMap);
-    defer loaded.land.deinit(zhu.testing.allocator);
-    defer loaded.spatial.deinit(zhu.testing.allocator);
+    loaded = loader.load(std.testing.allocator, &world, testMap);
+    defer loaded.land.deinit(std.testing.allocator);
+    defer loaded.spatial.deinit(std.testing.allocator);
     defer loaded.vertexes.clearAndFree(std.testing.allocator);
 
     loaded.spatial.tiles[0].insert(.arable);
@@ -680,8 +680,8 @@ test "对象层产出对象按碰撞范围占用格子" {
 }
 
 test "当前地图跨天会推进作物并清干湿地" {
-    loaded.land = Land.init(zhu.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(zhu.testing.allocator);
+    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
+    defer loaded.land.deinit(std.testing.allocator);
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();

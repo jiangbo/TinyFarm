@@ -193,8 +193,8 @@ pub fn canMove(self: Spatial, world: *World, entity: Entity, to: zhu.Vector2) bo
 
 test "isBlocked 检测碰撞框是否与 solid 格子重叠" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const collider: Shape = .{
         .rect = .init(.xy(-5, -6), .xy(10, 6)),
@@ -210,8 +210,8 @@ test "isBlocked 检测碰撞框是否与 solid 格子重叠" {
 
 test "isBlocked 方向标记会阻挡对应半格" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const collider: Shape = .{
         .rect = .init(.zero, .xy(10, 6)),
@@ -226,8 +226,8 @@ test "isBlocked 方向标记会阻挡对应半格" {
 
 test "isBlocked 支持南侧半格阻挡" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const collider: Shape = .{
         .rect = .init(.zero, .xy(8, 8)),
@@ -241,8 +241,8 @@ test "isBlocked 支持南侧半格阻挡" {
 
 test "isBlocked 支持东侧半格阻挡" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const collider: Shape = .{
         .rect = .init(.zero, .xy(8, 8)),
@@ -256,8 +256,8 @@ test "isBlocked 支持东侧半格阻挡" {
 
 test "isBlocked 不会把贴边当成碰撞" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     spatial.tiles[spatial.grid.worldToIndex(.xy(40, 40)).?].setUnion(solid);
     const collider: Shape = .{
@@ -271,8 +271,8 @@ test "isBlocked 不会把贴边当成碰撞" {
 
 test "isBlocked 允许碰撞体贴住地图最大边界" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const collider: Shape = .{
         .rect = .init(.zero, .xy(10, 10)),
@@ -285,8 +285,8 @@ test "isBlocked 允许碰撞体贴住地图最大边界" {
 
 test "isBlocked 阻挡碰撞体越过地图边界" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const collider: Shape = .{
         .rect = .init(.zero, .xy(10, 10)),
@@ -307,14 +307,14 @@ test "isBlocked 阻挡碰撞体越过地图边界" {
 
 test "对象 collider 使用精确矩形保留桌子间通道" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
-    spatial.addSolidRect(zhu.testing.allocator, .init(
+    spatial.addSolidRect(std.testing.allocator, .init(
         .xy(83.083336, 106.208336),
         .xy(26.5, 28.25),
     ));
-    spatial.addSolidRect(zhu.testing.allocator, .init(
+    spatial.addSolidRect(std.testing.allocator, .init(
         .xy(83.04163, 154.22884),
         .xy(26.5, 28.25),
     ));
@@ -329,8 +329,8 @@ test "对象 collider 使用精确矩形保留桌子间通道" {
 
 test "setTileFlag 支持地图语义标记" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const position = zhu.Vector2.xy(24, 40);
     const index = spatial.grid.worldToIndex(position).?;
@@ -347,8 +347,8 @@ test "setTileFlag 支持地图语义标记" {
 
 test "setTileFlag 支持 SOLID 与其它标记组合" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const position = zhu.Vector2.xy(24, 40);
     const index = spatial.grid.worldToIndex(position).?;
@@ -362,8 +362,8 @@ test "setTileFlag 支持 SOLID 与其它标记组合" {
 
 test "canHoeTile 要求可耕作且没有地图阻挡语义" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const position = zhu.Vector2.xy(24, 40);
     const index = spatial.grid.worldToIndex(position).?;
@@ -387,8 +387,8 @@ test "canHoeTile 要求可耕作且没有地图阻挡语义" {
 
 test "isBlocked 圆形碰撞体检测 solid 瓦片" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
     const collider: Shape = .{
         .circle = .init(.xy(0, -5), 5),
@@ -408,10 +408,10 @@ test "isBlocked 圆形碰撞体检测 solid 瓦片" {
 
 test "isBlocked 圆形碰撞体与区域矩形精确碰撞" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(zhu.testing.allocator, grid);
-    defer spatial.deinit(zhu.testing.allocator);
+    var spatial = Spatial.init(std.testing.allocator, grid);
+    defer spatial.deinit(std.testing.allocator);
 
-    spatial.addSolidRect(zhu.testing.allocator, .init(.xy(83, 106), .xy(26, 28)));
+    spatial.addSolidRect(std.testing.allocator, .init(.xy(83, 106), .xy(26, 28)));
 
     const collider: Shape = .{
         .circle = .init(.xy(0, -5), 5),

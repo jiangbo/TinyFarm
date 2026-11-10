@@ -279,9 +279,9 @@ test "actor 点对象会生成 NPC，player 点对象只保留标记" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var loaded = load(zhu.testing.allocator, &world, mock[0]);
-    defer loaded.land.deinit(zhu.testing.allocator);
-    defer loaded.spatial.deinit(zhu.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, mock[0]);
+    defer loaded.land.deinit(std.testing.allocator);
+    defer loaded.spatial.deinit(std.testing.allocator);
     defer loaded.vertexes.clearAndFree(std.testing.allocator);
 
     var query = world.query(.{
@@ -308,9 +308,9 @@ test "trigger 对象会创建 ECS 触发器实体" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var loaded = load(zhu.testing.allocator, &world, mock[1]);
-    defer loaded.land.deinit(zhu.testing.allocator);
-    defer loaded.spatial.deinit(zhu.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, mock[1]);
+    defer loaded.land.deinit(std.testing.allocator);
+    defer loaded.spatial.deinit(std.testing.allocator);
     defer loaded.vertexes.clearAndFree(std.testing.allocator);
 
     var query = world.query(.{component.map.Trigger});
@@ -330,9 +330,9 @@ test "rest 对象会创建可交互实体" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var loaded = load(zhu.testing.allocator, &world, mock[2]);
-    defer loaded.land.deinit(zhu.testing.allocator);
-    defer loaded.spatial.deinit(zhu.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, mock[2]);
+    defer loaded.land.deinit(std.testing.allocator);
+    defer loaded.spatial.deinit(std.testing.allocator);
     defer loaded.vertexes.clearAndFree(std.testing.allocator);
 
     var query = world.query(.{
@@ -391,9 +391,9 @@ test "加载地图产出对象会按对象和 rock 图层写入目标格" {
 
     var testMap = mock[3];
     testMap.tileSets = &testTileSets;
-    var loaded = load(zhu.testing.allocator, &world, testMap);
-    defer loaded.land.deinit(zhu.testing.allocator);
-    defer loaded.spatial.deinit(zhu.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, testMap);
+    defer loaded.land.deinit(std.testing.allocator);
+    defer loaded.spatial.deinit(std.testing.allocator);
     defer loaded.vertexes.clearAndFree(std.testing.allocator);
 
     const tree = loaded.land.tiles[0].object.?;
