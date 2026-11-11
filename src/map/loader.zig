@@ -275,7 +275,6 @@ fn setProductTiles(ctx: *Context, entity: ecs.Entity, rect: zhu.Rect) void {
 }
 
 test "actor 点对象会生成 NPC，player 点对象只保留标记" {
-
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
@@ -352,7 +351,6 @@ test "rest 对象会创建可交互实体" {
 }
 
 test "加载地图产出对象会按对象和 rock 图层写入目标格" {
-
     const imageId = 1234;
     const tileSetId = 5678;
 

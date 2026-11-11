@@ -16,26 +16,19 @@ const ui = component.ui;
 
 const World = ecs.World;
 const Entity = ecs.Entity;
-const Sources = []const zhu.Animation.Source;
 const tiled = zhu.extend.tiled;
 const Object = tiled.Object;
-
-pub const Animation = struct {
-    type: actor.Action,
-    imageId: zhu.graphics.ImageId,
-    frames: []const zhu.graphics.Frame,
-};
 
 pub const Actor = struct {
     sprite: Sprite,
     rows: [4]i8,
-    animations: []const Animation,
+    sources: []const zhu.graphics.SourceT(actor.Action),
 };
 
 pub const Character = struct {
     sprite: Sprite,
     rows: [4]i8,
-    animations: []const Animation,
+    sources: []const zhu.graphics.SourceT(actor.Action),
     speed: f32,
     wanderRadius: f32,
     soundId: ?sound.Id = null,
@@ -120,13 +113,13 @@ pub fn spawnPlayer(world: *World, spawn: zhu.Vector2) void {
         .circle = .init(.xy(0, -5), 5),
     });
     world.add(player, motion.Blocking{});
-    world.add(player, actor.Actor{ .rows = config.rows });
-
-    const sources = comptime animationSources(
-        config.animations,
-        config.sprite.rect.size,
-    );
-    const animation = zhu.Animation.initSource(&sources);
+    const character: actor.Actor = .{
+        .rows = config.rows,
+        .sources = .generate(config.sources),
+    };
+    world.add(player, character);
+    const source = character.sources.get(.idle);
+    const animation = zhu.Animation.initSource(source);
 
     world.add(player, render.Sprite{
         .image = animation.subImage(),
@@ -143,18 +136,9 @@ pub fn spawnPlayer(world: *World, spawn: zhu.Vector2) void {
 pub fn spawnAnimal(world: *World, kind: actor.Animal) Entity {
     const config = zon.animals[@backingInt(kind)];
 
-    // inline else 让每种动物的动画源在编译期按枚举值分别计算
-    const sources = blk: switch (kind) {
-        inline else => |k| {
-            const source = zon.animals[@backingInt(k)].animations;
-            break :blk &comptime animationSources(
-                source,
-                zon.animals[@backingInt(k)].sprite.rect.size,
-            );
-        },
+    const entity = switch (kind) {
+        inline else => |tag| spawnNpc(world, zon.animals[@backingInt(tag)]),
     };
-
-    const entity = spawnNpc(world, config, sources);
     world.add(entity, kind);
     const interval = actor.Life.eatInterval;
     world.add(entity, actor.Life{
@@ -166,23 +150,23 @@ pub fn spawnAnimal(world: *World, kind: actor.Animal) Entity {
 }
 
 pub fn spawnFriend(world: *World) Entity {
-    // friend 动画源在编译期计算，配置缺失会直接编译失败。
-    const sources = comptime animationSources(
-        zon.friend.animations,
-        zon.friend.sprite.rect.size,
-    );
-    return spawnNpc(world, zon.friend, &sources);
+    return spawnNpc(world, zon.friend);
 }
 
-fn spawnNpc(world: *World, config: Character, sources: Sources) Entity {
+fn spawnNpc(world: *World, comptime config: Character) Entity {
     const entity = world.createEntity();
     world.add(entity, motion.Velocity{});
     world.add(entity, motion.Shape{
         .circle = .init(.xy(0, -5), 5),
     });
     world.add(entity, motion.Blocking{});
-    world.add(entity, actor.Actor{ .rows = config.rows });
-    const animation = zhu.Animation.initSource(sources);
+    const character: actor.Actor = .{
+        .rows = config.rows,
+        .sources = .generate(config.sources),
+    };
+    world.add(entity, character);
+    const source = character.sources.get(.idle);
+    const animation = zhu.Animation.initSource(source);
 
     world.add(entity, render.Sprite{
         .image = animation.subImage(),
@@ -455,27 +439,8 @@ pub fn spawnPickup(world: *World, args: struct {
     world.add(entity, render.YSort{});
 }
 
-// 动画源数组按 Action 枚举全长定长，未配置的动作留空 Source。
-// 角色只会切到已配置动画的动作，空槽不会被访问到。
-const actionCount = @typeInfo(actor.Action).@"enum".field_names.len;
-
-fn animationSources(comptime animations: []const Animation, size: zhu.Vector2) //
-[actionCount]zhu.Animation.Source {
-    var sources: [actionCount]zhu.Animation.Source =
-        std.mem.zeroes([actionCount]zhu.Animation.Source);
-    for (animations) |config| {
-        sources[@backingInt(config.type)] = .{
-            .imageId = config.imageId,
-            .frames = config.frames,
-            .size = size,
-        };
-    }
-    return sources;
-}
-
 const expectEqual = std.testing.expectEqual;
 test "spawnPlayer 会创建玩家实体" {
-
     var world = World.init(std.testing.allocator);
     defer world.deinit();
 
@@ -491,7 +456,6 @@ test "spawnPlayer 会创建玩家实体" {
 }
 
 test "spawnPlayer 重复调用只保留一个玩家" {
-
     var world = World.init(std.testing.allocator);
     defer world.deinit();
 
@@ -506,7 +470,6 @@ test "spawnPlayer 重复调用只保留一个玩家" {
 }
 
 test "spawnAnimal 会创建可漫游动物实体" {
-
     var world = World.init(std.testing.allocator);
     defer world.deinit();
 
@@ -526,7 +489,6 @@ test "spawnAnimal 会创建可漫游动物实体" {
 }
 
 test "spawnFriend 会创建可对话 NPC 实体" {
-
     var world = World.init(std.testing.allocator);
     defer world.deinit();
 
@@ -540,7 +502,6 @@ test "spawnFriend 会创建可对话 NPC 实体" {
 }
 
 test "spawnCrop 会按作物类型设置 kind 和 next" {
-
     var world = World.init(std.testing.allocator);
     defer world.deinit();
 
@@ -566,7 +527,6 @@ test "spawnCrop 会按作物类型设置 kind 和 next" {
 }
 
 test "advanceCrop 会推进阶段并保持 kind" {
-
     const kinds = [_]farm.CropEnum{ .strawberry, .potato };
     for (kinds) |kind| {
         const config = zon.crops[@backingInt(kind)];
@@ -585,7 +545,6 @@ test "advanceCrop 会推进阶段并保持 kind" {
 }
 
 test "地图摆件按底边定位生成实体" {
-
     const imageId = 1234;
     const tileSetId = 5678;
 
@@ -639,7 +598,6 @@ test "地图摆件按底边定位生成实体" {
 }
 
 test "地图摆件优先用碰撞底边作为排序点" {
-
     const imageId = 1234;
     const tileSetId = 5678;
 
@@ -699,7 +657,6 @@ test "地图摆件优先用碰撞底边作为排序点" {
 }
 
 test "带 anim_id 的地图摆件会创建停止的非循环动画" {
-
     const imageId = 1234;
     const tileSetId = 5678;
 

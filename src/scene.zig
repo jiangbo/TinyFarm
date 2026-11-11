@@ -252,7 +252,7 @@ fn capture() storage.Record {
     const inv = world.getResourcePtr(resource.Inventory).?;
 
     return .{
-        .timestamp = zhu.window.timestamp().toSeconds(),
+        .timestamp = zhu.timestamp().toSeconds(),
         .clock = clock.*,
         .player = player.capture(&world, map.current),
         .inventory = inv.capture(),

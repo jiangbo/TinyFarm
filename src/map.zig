@@ -586,7 +586,6 @@ test "恢复 gone 会删除默认产出对象并清 tile 阻挡" {
 }
 
 test "对象层产出对象按碰撞范围占用格子" {
-
     const imageId = 4321;
     const tileSetId = 8765;
 

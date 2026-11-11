@@ -8,14 +8,9 @@ var soundBuffer: [20]zhu.audio.Sound = undefined;
 var debug = false;
 
 pub fn init(allocator: zhu.Allocator) void {
-    zhu.assets.loadAtlas(@import("zon/atlas.zon"), .nearest);
-    zhu.batch.init(&commandBuffer);
+    _ = zhu.loadAtlas(@import("zon/atlas.zon"), .{});
+    zhu.batch.init(&commandBuffer, zhu.getImage("circle.png").?);
     zhu.audio.init(&soundBuffer, .{ .sample_rate = 22050 });
-
-    zhu.batch.circleImage = zhu.getImage("circle.png").?;
-    const size = zhu.batch.circleImage.size;
-    const rect = zhu.Rect.init(.zero, size).centerScale(0.25);
-    zhu.batch.whiteImage = zhu.batch.circleImage.sub(rect);
 
     var font: zhu.text.static.Font = @import("zon/font.zon");
     font.lineHeight += 2;
@@ -62,8 +57,7 @@ pub fn deinit(_: zhu.Allocator) void {
 }
 
 pub fn main(initInfo: std.process.Init) void {
-    zhu.init(initInfo);
-    zhu.extend.storage.init(initInfo, "farm");
+    zhu.setup(initInfo, .{ .storage = "farm" });
     zhu.window.run("迷你农场", .xy(1280, 720), .{
         .logicSize = .xy(640, 360),
         .scaleEnum = .fit,

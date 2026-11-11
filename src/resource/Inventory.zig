@@ -86,7 +86,7 @@ pub fn move(self: *Self, from: usize, to: usize) ?Move {
     switch (moved) {
         .swap => self.hotbarSwap(from, to),
         .merge => {},
-        .clear => self.hotbarReplace(from, to),
+        .move, .clear => self.hotbarReplace(from, to),
     }
     return moved;
 }

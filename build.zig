@@ -26,7 +26,7 @@ pub fn build(b: *std.Build) !void {
 
     // 将现有素材原样安装到对应平台的运行目录。
     const assets = b.addInstallDirectory(.{
-        .source_dir = b.path("raw-assets"),
+        .source_dir = b.path("assets"),
         .install_dir = if (web) .prefix else .bin,
         .install_subdir = if (web) "web/assets" else "assets",
     });

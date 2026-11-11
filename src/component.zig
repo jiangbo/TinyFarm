@@ -81,6 +81,7 @@ pub const actor = struct {
         action: Action = .idle,
         facing: Facing = .down,
         rows: [4]i8 = .{ 1, 2, -3, 3 },
+        sources: zhu.graphics.Sources(Action) = .init(&.{}),
     };
     pub const Busy = struct {};
 

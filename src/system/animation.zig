@@ -35,7 +35,8 @@ pub fn update(world: *ecs.World, delta: f32) void {
                 actor.action = .idle;
 
                 const frameRow = actorRow(actor, sprite);
-                playActor(animation, .idle, frameRow, true);
+                animation.play(actor.sources.get(actor.action));
+                animation.row = frameRow;
                 sprite.image = animation.subImage();
             },
         }
@@ -50,20 +51,12 @@ fn updateActor(world: *ecs.World) void {
         const sprite = row.getPtr(Sprite);
 
         const frameRow = actorRow(actor, sprite);
-        const index = zhu.toIndex(u8, actor.action);
-        const sameAction = animation.sourceIndex == index;
+        const sameAction = animation.getEnumExtend(Action) == actor.action;
         if (sameAction and animation.row == frameRow) continue;
 
-        const loop = actor.action == .idle or
-            actor.action == .walk or actor.action == .sleep or
-            actor.action == .eat;
-        playActor(animation, actor.action, frameRow, loop);
+        animation.play(actor.sources.get(actor.action));
+        animation.row = frameRow;
     }
-}
-
-fn playActor(animation: *Animation, action: Action, row: u8, loop: bool) void {
-    animation.play(action, row);
-    animation.source.loop = loop;
 }
 
 fn actorRow(actor: *const Actor, sprite: *Sprite) u8 {
@@ -74,21 +67,25 @@ fn actorRow(actor: *const Actor, sprite: *Sprite) u8 {
 }
 
 test "动画系统会按角色方向行更新精灵" {
-    const frames = [_]zhu.graphics.Frame{
+    const frames = comptime [_]zhu.graphics.Frame{
         .{ .offset = .zero, .duration = 0.1 },
     };
-    const image = zhu.Image{ .size = .xy(32, 32) };
+    const image = comptime zhu.Image{ .size = .xy(32, 32) };
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
     const entity = world.createEntity();
-    world.add(entity, Actor{ .action = .walk, .facing = .left });
-    const sources = [_]zhu.Animation.Source{
+    const sources = comptime [_]zhu.graphics.SourceT(Action){
         .{ .imageId = 1, .frames = &frames, .size = image.size },
-        .{ .imageId = 1, .frames = &frames, .size = image.size },
+        .{ .imageId = 1, .frames = &frames, .size = image.size, .extend = .walk },
     };
-    world.add(entity, Animation.initSource(&sources));
+    world.add(entity, Actor{
+        .action = .walk,
+        .facing = .left,
+        .sources = comptime .init(&sources),
+    });
+    world.add(entity, Animation.initSource(sources[0].toSource()));
     world.add(entity, Sprite{ .image = image });
 
     update(&world, 0);
@@ -99,24 +96,25 @@ test "动画系统会按角色方向行更新精灵" {
 }
 
 test "负数行号表示翻转" {
-    const frames = [_]zhu.graphics.Frame{
+    const frames = comptime [_]zhu.graphics.Frame{
         .{ .offset = .zero, .duration = 0.1 },
     };
-    const image = zhu.Image{ .size = .xy(32, 32) };
+    const image = comptime zhu.Image{ .size = .xy(32, 32) };
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
     const entity = world.createEntity();
+    const sources = comptime [_]zhu.graphics.SourceT(Action){
+        .{ .imageId = 1, .frames = &frames, .size = image.size },
+    };
     world.add(entity, Actor{
         .action = .idle,
         .facing = .right,
         .rows = .{ 1, 2, 3, -1 },
+        .sources = comptime .init(&sources),
     });
-    const sources = [_]zhu.Animation.Source{
-        .{ .imageId = 1, .frames = &frames, .size = image.size },
-    };
-    world.add(entity, Animation.initSource(&sources));
+    world.add(entity, Animation.initSource(sources[0].toSource()));
     world.add(entity, Sprite{ .image = image });
 
     update(&world, 0);
@@ -127,24 +125,33 @@ test "负数行号表示翻转" {
 }
 
 test "工具动画结束后解除忙碌状态" {
-    const frames = [_]zhu.graphics.Frame{
+    const frames = comptime [_]zhu.graphics.Frame{
         .{ .offset = .zero, .duration = 0.1 },
     };
-    const image = zhu.Image{ .size = .xy(32, 32) };
+    const image = comptime zhu.Image{ .size = .xy(32, 32) };
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
     const entity = world.createEntity();
-    world.add(entity, Actor{ .action = .hoe });
-    const sources = [_]zhu.Animation.Source{
+    const sources = comptime [_]zhu.graphics.SourceT(Action){
         .{ .imageId = 1, .frames = &frames, .size = image.size },
         .{ .imageId = 1, .frames = &frames, .size = image.size },
         .{ .imageId = 1, .frames = &frames, .size = image.size },
         .{ .imageId = 1, .frames = &frames, .size = image.size },
-        .{ .imageId = 1, .frames = &frames, .size = image.size },
+        .{
+            .imageId = 1,
+            .frames = &frames,
+            .size = image.size,
+            .extend = .hoe,
+            .loop = false,
+        },
     };
-    world.add(entity, Animation.initSource(&sources));
+    world.add(entity, Actor{
+        .action = .hoe,
+        .sources = .generate(&sources),
+    });
+    world.add(entity, Animation.initSource(sources[0].toSource()));
     world.add(entity, Sprite{ .image = image });
     world.add(entity, Busy{});
 
@@ -156,7 +163,7 @@ test "工具动画结束后解除忙碌状态" {
 }
 
 test "动画进入关键帧时挂上生效标记" {
-    const frames = [_]zhu.graphics.Frame{
+    const frames = comptime [_]zhu.graphics.Frame{
         .{ .offset = .zero, .duration = 0.1 },
         .{
             .offset = .xy(32, 0),
@@ -164,21 +171,27 @@ test "动画进入关键帧时挂上生效标记" {
             .extend = 1,
         },
     };
-    const image = zhu.Image{ .size = .xy(64, 32) };
+    const image = comptime zhu.Image{ .size = .xy(64, 32) };
 
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
     const entity = world.createEntity();
-    world.add(entity, Actor{ .action = .hoe });
-    const sources = [_]zhu.Animation.Source{
+    const sources = comptime [_]zhu.graphics.SourceT(Action){
         .{ .imageId = 1, .frames = &frames, .size = image.size },
         .{ .imageId = 1, .frames = &frames, .size = image.size },
         .{ .imageId = 1, .frames = &frames, .size = image.size },
         .{ .imageId = 1, .frames = &frames, .size = image.size },
-        .{ .imageId = 1, .frames = &frames, .size = image.size },
+        .{
+            .imageId = 1,
+            .frames = &frames,
+            .size = image.size,
+            .extend = .hoe,
+            .loop = false,
+        },
     };
-    world.add(entity, Animation.initSource(&sources));
+    world.add(entity, Actor{ .action = .hoe, .sources = .generate(&sources) });
+    world.add(entity, Animation.initSource(sources[0].toSource()));
     world.add(entity, Sprite{ .image = image });
     world.add(entity, Busy{});
 

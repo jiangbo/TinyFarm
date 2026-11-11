@@ -70,8 +70,8 @@ var config: Config = .{};
 pub var slots: [10]Slot = @splat(.empty);
 
 pub fn init(world: *World) Config {
-    config = load(Config, "config.json", .{});
-    slots = load(@TypeOf(slots), "saves/slots.json", @splat(.empty));
+    config = load(Config, "config.bin", .{});
+    slots = load(@TypeOf(slots), "saves/slots.bin", @splat(.empty));
     sync(world, config);
     return config;
 }
@@ -80,7 +80,7 @@ pub fn update(world: *World, cfg: Config) void {
     if (std.meta.eql(config, cfg)) return;
 
     sync(world, cfg);
-    zhu.extend.storage.writeJson("config.json", cfg) catch |err| {
+    zhu.extend.storage.writeValue("config.bin", cfg) catch |err| {
         std.log.err("save config failed: {}", .{err});
         return;
     };
@@ -93,34 +93,76 @@ fn sync(world: *World, cfg: Config) void {
     zhu.audio.soundVolume.store(cfg.sound, .release);
 }
 
-pub fn read(slot: u8) !std.json.Parsed(Record) {
+pub fn read(slot: u8) !zhu.extend.storage.Loaded(Record) {
     var buffer: [32]u8 = undefined;
-    const path = zhu.formatZ(&buffer, "saves/slot{d}.json", .{slot});
-    const record = try zhu.extend.storage.readJson(Record, path);
+    const path = zhu.formatZ(&buffer, "saves/slot{d}.bin", .{slot});
+    const record = try zhu.extend.storage.readValue(Record, path);
     std.log.info("game loaded: {s}", .{path});
     return record;
 }
 
 pub fn write(slot: u8, record: Record) !void {
     var buffer: [32]u8 = undefined;
-    const path = zhu.formatZ(&buffer, "saves/slot{d}.json", .{slot});
+    const path = zhu.formatZ(&buffer, "saves/slot{d}.bin", .{slot});
 
-    try zhu.extend.storage.writeJson(path, record);
+    try zhu.extend.storage.writeValue(path, record);
 
     slots[slot] = .{ .valid = .{
         .day = record.clock.day,
         .timestamp = record.timestamp,
     } };
-    try zhu.extend.storage.writeJson("saves/slots.json", slots);
+    try zhu.extend.storage.writeValue("saves/slots.bin", slots);
     std.log.info("game saved: {s}", .{path});
 }
 
 fn load(T: type, path: [:0]const u8, default: T) T {
-    var loaded = zhu.extend.storage.readJson(T, path) catch |err| switch (err) {
+    var loaded = zhu.extend.storage.readValue(T, path) catch |err| switch (err) {
         error.FileNotFound => return default,
         else => std.debug.panic("load {s} failed: {}", .{ path, err }),
     };
     defer loaded.deinit();
 
     return loaded.value;
+}
+
+test "二进制存档保留背包绑定和地图对象状态" {
+    var tiles = [_]Tile{
+        .{ .index = 2, .ground = .wet, .object = .{ .crop = .{
+            .kind = .potato,
+            .stage = .growing,
+            .timer = 0.5,
+            .watered = true,
+        } } },
+        .{ .index = 3, .object = .gone },
+        .{ .index = 4, .object = .{ .chest = .{ .opened = true } } },
+        .{ .index = 5, .object = .{ .product = .{ .value = 2 } } },
+        .{ .index = 6 },
+    };
+    var record: Record = .{
+        .timestamp = 123456789,
+        .clock = .{ .day = 3, .hour = 19, .period = .night },
+        .player = .{
+            .map = .exterior,
+            .position = .xy(32, 48),
+            .facing = .left,
+        },
+        .inventory = .{
+            .activeHotbar = 1,
+            .slots = &.{.{ .item = .potato, .count = 7 }},
+            .hotbar = &.{ null, 0 },
+        },
+    };
+    record.maps.maps.set(.exterior, .{ .day = 3, .tiles = &tiles });
+
+    const codec = zhu.extend.storage;
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+    try codec.encode(&output.writer, record);
+
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var reader: std.Io.Reader = .fixed(output.writer.buffered());
+    const restored = try codec.decode(&reader, Record, arena.allocator());
+    try std.testing.expectEqualDeep(record, restored);
+    try std.testing.expectEqual(output.writer.buffered().len, reader.seek);
 }
