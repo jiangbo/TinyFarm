@@ -22,13 +22,13 @@ const Object = tiled.Object;
 pub const Actor = struct {
     sprite: Sprite,
     rows: [4]i8,
-    sources: []const zhu.graphics.SourceT(actor.Action),
+    sources: zhu.graphics.SliceSource(actor.Action),
 };
 
 pub const Character = struct {
     sprite: Sprite,
     rows: [4]i8,
-    sources: []const zhu.graphics.SourceT(actor.Action),
+    sources: zhu.graphics.SliceSource(actor.Action),
     speed: f32,
     wanderRadius: f32,
     soundId: ?sound.Id = null,
