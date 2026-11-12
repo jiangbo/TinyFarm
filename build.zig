@@ -17,6 +17,7 @@ pub fn build(b: *std.Build) !void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .strip = optimize != .debug,
         .imports = &.{
             .{ .name = "ecs", .module = migu.module("ecs") },
             .{ .name = "zhu", .module = zhuyu.module("zhu") },
