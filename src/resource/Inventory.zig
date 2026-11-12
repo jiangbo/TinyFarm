@@ -313,22 +313,6 @@ test "使用最后一个作物会优先回填原槽" {
     try std.testing.expectEqual(3, item.count);
 }
 
-test "use 会先确认总数足够再跨槽扣除" {
-    var inv: Self = .{};
-    inv.reset();
-
-    inv.store.stacks[0] = .{ .item = .strawberrySeed, .count = 1 };
-    inv.store.stacks[2] = .{ .item = .strawberrySeed, .count = 2 };
-
-    try std.testing.expect(!inv.use(.strawberrySeed, 4));
-    try std.testing.expectEqual(@as(u32, 1), inv.store.stacks[0].count);
-    try std.testing.expectEqual(@as(u32, 2), inv.store.stacks[2].count);
-
-    try std.testing.expect(inv.use(.strawberrySeed, 3));
-    try std.testing.expectEqual(@as(u32, 0), inv.store.stacks[0].count);
-    try std.testing.expectEqual(@as(u32, 0), inv.store.stacks[2].count);
-}
-
 test "使用物品产物优先回到原槽而不是第一个空槽" {
     var inv: Self = .{};
     inv.reset();

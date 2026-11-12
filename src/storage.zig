@@ -80,7 +80,7 @@ pub fn update(world: *World, cfg: Config) void {
     if (std.meta.eql(config, cfg)) return;
 
     sync(world, cfg);
-    zhu.extend.storage.writeValue("config.bin", cfg) catch |err| {
+    zhu.storage.writeValue("config.bin", cfg) catch |err| {
         std.log.err("save config failed: {}", .{err});
         return;
     };
@@ -93,10 +93,10 @@ fn sync(world: *World, cfg: Config) void {
     zhu.audio.soundVolume.store(cfg.sound, .release);
 }
 
-pub fn read(slot: u8) !zhu.extend.storage.Loaded(Record) {
+pub fn read(slot: u8) !zhu.storage.Loaded(Record) {
     var buffer: [32]u8 = undefined;
     const path = zhu.formatZ(&buffer, "saves/slot{d}.bin", .{slot});
-    const record = try zhu.extend.storage.readValue(Record, path);
+    const record = try zhu.storage.readValue(Record, path);
     std.log.info("game loaded: {s}", .{path});
     return record;
 }
@@ -105,18 +105,18 @@ pub fn write(slot: u8, record: Record) !void {
     var buffer: [32]u8 = undefined;
     const path = zhu.formatZ(&buffer, "saves/slot{d}.bin", .{slot});
 
-    try zhu.extend.storage.writeValue(path, record);
+    try zhu.storage.writeValue(path, record);
 
     slots[slot] = .{ .valid = .{
         .day = record.clock.day,
         .timestamp = record.timestamp,
     } };
-    try zhu.extend.storage.writeValue("saves/slots.bin", slots);
+    try zhu.storage.writeValue("saves/slots.bin", slots);
     std.log.info("game saved: {s}", .{path});
 }
 
 fn load(T: type, path: [:0]const u8, default: T) T {
-    var loaded = zhu.extend.storage.readValue(T, path) catch |err| switch (err) {
+    var loaded = zhu.storage.readValue(T, path) catch |err| switch (err) {
         error.FileNotFound => return default,
         else => std.debug.panic("load {s} failed: {}", .{ path, err }),
     };
@@ -154,7 +154,7 @@ test "二进制存档保留背包绑定和地图对象状态" {
     };
     record.maps.maps.set(.exterior, .{ .day = 3, .tiles = &tiles });
 
-    const codec = zhu.extend.storage;
+    const codec = zhu.codec;
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
     try codec.encode(&output.writer, record);

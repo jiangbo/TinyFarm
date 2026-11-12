@@ -18,28 +18,28 @@ pub fn update(world: *ecs.World, delta: f32) void {
         const animation = row.getPtr(Animation);
         const sprite = row.getPtr(Sprite);
 
-        switch (animation.update(delta) orelse continue) {
-            .next, .loop => {
-                sprite.image = animation.subImage();
+        animation.advance(delta);
+        while (animation.nextStep()) |step| switch (step) {
+            .start, .next, .loop => {
                 if (animation.frame().extend == 0) continue;
 
-                // extend 非零表示这一帧是动作生效点，具体效果由 farm 系统处理。
+                // 进入关键帧时记录标记，保留追帧途中的动作。
                 query.add(world, row.entity, UseFrame{});
             },
             .end => {
                 if (!world.has(row.entity, Busy)) continue;
 
-                // 工具动画完整播放后恢复待机，下一帧控制系统才能再次接管。
+                // 工具动画完整播放后恢复待机。
                 world.remove(row.entity, Busy);
                 const actor = world.getPtr(row.entity, Actor).?;
                 actor.action = .idle;
 
                 const frameRow = actorRow(actor, sprite);
-                animation.play(actor.sources.get(actor.action));
-                animation.row = frameRow;
-                sprite.image = animation.subImage();
+                animation.play(actor.sources.get(actor.action), frameRow);
+                break;
             },
-        }
+        };
+        sprite.image = animation.subImage();
     }
 }
 
@@ -54,8 +54,7 @@ fn updateActor(world: *ecs.World) void {
         const sameAction = animation.getEnumExtend(Action) == actor.action;
         if (sameAction and animation.row == frameRow) continue;
 
-        animation.play(actor.sources.get(actor.action));
-        animation.row = frameRow;
+        animation.play(actor.sources.get(actor.action), frameRow);
     }
 }
 
