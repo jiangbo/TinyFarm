@@ -365,7 +365,7 @@ fn spotDirection(spot: zhu.extend.tiled.ClassProperty) zhu.Vector2 {
 fn applyLight(world: *World, entity: Entity, object: Object) void {
     const day = object.getProperty("day_only", bool) orelse false;
     const night = object.getProperty("night_only", bool) orelse !day;
-    world.addAll(entity, .{ light.Disabled{}, light.Pending{} });
+    world.addMany(entity, .{ light.Disabled{}, light.Pending{} });
 
     if (day) world.add(entity, light.Day{});
 
