@@ -42,7 +42,7 @@ pub fn update(delta: f32) ?Request {
 
     if (popup) |active| return updatePopup(active);
 
-    const pauseKey = input.pressed(.pause);
+    const pauseKey = input.released(.pause);
     if (pauseKey or pauseButton.update(.{}) != null) {
         pause.open(.title);
         popup = .pause;

@@ -62,7 +62,7 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
         return .block;
     }
 
-    if (input.pressed(.pause)) {
+    if (input.released(.pause)) {
         openPause();
         return .block;
     }
