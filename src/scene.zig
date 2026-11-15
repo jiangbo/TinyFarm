@@ -16,8 +16,6 @@ const resource = struct {
     const Inventory = @import("resource/Inventory.zig");
     const Notice = @import("resource/Notice.zig");
     const Speed = @import("resource/Speed.zig");
-
-    const keep = .{ Clock, Inventory, Notice, Speed };
 };
 
 const World = ecs.World;
@@ -139,7 +137,7 @@ fn updatePlay(delta: f32) void {
     if (clock.paused) return;
 
     // 已提交的切图请求先进入过渡，不再瞬时换图。
-    if (world.getIdentity(actor.Player, Transition) != null) {
+    if (world.getByIdentity(actor.Player, Transition) != null) {
         mapFade.phase = .out;
         mapFade.timer.restart();
         return;
@@ -155,7 +153,7 @@ fn updateMapFade(delta: f32) bool {
 
     switch (phase) {
         .out => {
-            const playerEntity = world.getIdentityEntity(actor.Player).?;
+            const playerEntity = world.getIdentity(actor.Player).?;
             const request = world.get(playerEntity, Transition).?;
             map.exit(allocator, &world);
             resetWorld();
@@ -278,8 +276,8 @@ fn restore(record: storage.Record) void {
 }
 
 fn resetWorld() void {
-    // 重建世界时保留时钟、背包、提示和速度资源。
-    world.resetKeepResources(resource.keep);
+    // 重建世界时保留全部资源。
+    world.resetKeepResources();
 }
 
 fn drawPlay() void {

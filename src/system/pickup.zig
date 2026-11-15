@@ -20,7 +20,7 @@ const arcHeight: f32 = 6;
 pub fn update(world: *World, delta: f32) void {
     updateMotion(world, delta);
 
-    const player = world.getIdentityEntity(Player).?;
+    const player = world.getIdentity(Player).?;
     const playerShape = worldShape(world, player) orelse return;
     const notice = world.getResourcePtr(Notice).?;
 

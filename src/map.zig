@@ -352,7 +352,7 @@ fn refreshCropSprite(world: *World, entity: Entity, crop: farm.Crop) void {
 pub fn drawBack() void {
     if (loaded.vertexes.items.len != 0) {
         const back = loaded.vertexes.items[0..loaded.frontStart];
-        zhu.batch.drawVertices(back, mapImage);
+        zhu.batch.drawVertices(mapImage, back);
     }
 
     loaded.land.draw(dryLandImage, wetLandImage);
@@ -361,7 +361,7 @@ pub fn drawBack() void {
 pub fn drawFront() void {
     if (loaded.frontStart == loaded.vertexes.items.len) return;
     const front = loaded.vertexes.items[loaded.frontStart..];
-    zhu.batch.drawVertices(front, null);
+    zhu.batch.drawVertices(mapImage, front);
 }
 
 test "地图状态作物会按离线天数推进" {

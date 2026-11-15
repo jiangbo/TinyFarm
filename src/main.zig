@@ -14,7 +14,7 @@ pub fn init(allocator: zhu.Allocator) void {
 
     var font: zhu.text.static.Font = @import("zon/font.zon");
     font.lineHeight += 2;
-    zhu.text.init(font, .{});
+    zhu.text.static.initBitmap(font, .{});
 
     zhu.window.useWindowIcon("icon.ico");
     zhu.window.useCursor("cursor.png", .{});

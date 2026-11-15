@@ -5,12 +5,12 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .migu = .{
-            .url = "git+https://github.com/jiangbo/MiGu#6e9500347b07f30b058b45ad3cee861efc1d4957",
-            .hash = "migu-0.2.0-1dj5JozrAABjmSVxQjIhwMRFrLrWqnhkRkeD-rtSZESH",
+            .url = "git+https://github.com/jiangbo/MiGu#59a91fa1182fed7bf6816eb3b88dde64dbfaf1fc",
+            .hash = "migu-0.2.0-1dj5Jl3rAACvjhH51_2CDydbAlBdNO5zIjn3SwHN2Pi8",
         },
         .zhuyu = .{
-            .url = "git+https://github.com/jiangbo/ZhuYu#b1f647c1258d70a44442ab3913da35cf79ff976c",
-            .hash = "zhuyu-0.1.0-U4gVRhQ_CgDZH3vUv9aRjxVxD3XR6VkajI-OeaeP8zMe",
+            .url = "git+https://github.com/jiangbo/ZhuYu#d015532785f8587e9bbe6f2fdc4f61267275d592",
+            .hash = "zhuyu-0.1.0-U4gVRl5cCgBgtLxFvmum4S_UsKpTF8-lZTegUhx1G8bt",
         },
     },
 

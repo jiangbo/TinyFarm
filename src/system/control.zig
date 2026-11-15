@@ -24,7 +24,7 @@ const playerSpeed: f32 = 60;
 const tileRange: i32 = 1;
 
 pub fn update(world: *World) void {
-    const player = world.getIdentityEntity(Player).?;
+    const player = world.getIdentity(Player).?;
 
     // 工具动作播放期间不接收新的移动和工具输入。
     if (world.has(player, Busy)) return;
@@ -34,7 +34,7 @@ pub fn update(world: *World) void {
 }
 
 pub fn draw(world: *World) void {
-    const player = world.getIdentityEntity(Player).?;
+    const player = world.getIdentity(Player).?;
     const target = world.get(player, Target).?;
     if (!target.active) return;
 

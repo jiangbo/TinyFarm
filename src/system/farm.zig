@@ -21,7 +21,7 @@ const event = component.event;
 const World = ecs.World;
 
 pub fn update(world: *World) void {
-    const player = world.getIdentityEntity(Player).?;
+    const player = world.getIdentity(Player).?;
     if (!world.has(player, UseFrame)) return;
 
     useItem(world, world.get(player, WantUse).?);

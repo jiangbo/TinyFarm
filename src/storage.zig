@@ -115,7 +115,7 @@ pub fn write(slot: u8, record: Record) !void {
     std.log.info("game saved: {s}", .{path});
 }
 
-fn load(T: type, path: [:0]const u8, default: T) T {
+fn load(T: type, path: []const u8, default: T) T {
     var loaded = zhu.storage.readValue(T, path) catch |err| switch (err) {
         error.FileNotFound => return default,
         else => std.debug.panic("load {s} failed: {}", .{ path, err }),

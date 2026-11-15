@@ -99,7 +99,7 @@ pub fn resolveImage(sprite: Sprite) zhu.graphics.Image {
 }
 
 pub fn spawnPlayer(world: *World, spawn: zhu.Vector2) void {
-    if (world.getIdentityEntity(actor.Player)) |oldPlayer| {
+    if (world.getIdentity(actor.Player)) |oldPlayer| {
         world.destroyEntity(oldPlayer);
         world.removeIdentity(actor.Player);
     }
@@ -446,7 +446,7 @@ test "spawnPlayer 会创建玩家实体" {
 
     spawnPlayer(&world, .xy(160, 96));
 
-    const player = world.getIdentityEntity(actor.Player).?;
+    const player = world.getIdentity(actor.Player).?;
     try expectEqual(160, world.get(player, component.Position).?.x);
     try expectEqual(1, world.values(motion.Velocity).len);
     try expectEqual(1, world.values(actor.Actor).len);
@@ -462,7 +462,7 @@ test "spawnPlayer 重复调用只保留一个玩家" {
     spawnPlayer(&world, .xy(160, 96));
     spawnPlayer(&world, .xy(200, 128));
 
-    const player = world.getIdentityEntity(actor.Player).?;
+    const player = world.getIdentity(actor.Player).?;
     try expectEqual(200, world.get(player, component.Position).?.x);
     try expectEqual(1, world.values(component.Position).len);
     try expectEqual(1, world.values(motion.Velocity).len);

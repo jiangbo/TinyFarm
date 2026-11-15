@@ -15,7 +15,7 @@ const Animation = component.actor.Animation;
 const Shape = component.motion.Shape;
 
 pub fn update(world: *World) void {
-    const target = world.getIdentityEntity(Interact) orelse return;
+    const target = world.getIdentity(Interact) orelse return;
     if (!world.has(target, Chest)) return;
 
     const chest = world.getPtr(target, Chest).?;
@@ -119,7 +119,7 @@ test "chest 交互会打开宝箱并移除碰撞" {
     const chestState = world.get(chest, Chest).?;
     const animation = world.get(chest, Animation).?;
 
-    try std.testing.expectEqual(chest, world.getIdentityEntity(Interact).?);
+    try std.testing.expectEqual(chest, world.getIdentity(Interact).?);
     try std.testing.expect(chestState.opened);
     try std.testing.expectEqual(0, chestState.items.get(.potato));
     try std.testing.expectEqual(.potato, inv.store.stacks[0].item);
@@ -146,5 +146,5 @@ test "chest 背包满时奖励留在宝箱里" {
     try std.testing.expect(!result.opened);
     try std.testing.expectEqual(2, result.items.get(.potato));
     try std.testing.expect(world.has(chest, Shape));
-    try std.testing.expectEqual(chest, world.getIdentityEntity(Interact).?);
+    try std.testing.expectEqual(chest, world.getIdentity(Interact).?);
 }
