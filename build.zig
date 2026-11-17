@@ -31,6 +31,16 @@ pub fn build(b: *std.Build) !void {
         .install_dir = if (web) .prefix else .bin,
         .install_subdir = if (web) "web/assets" else "assets",
     });
+    const images = zhuBuild.copy.addStep(b, zhuyu, &.{
+        .{
+            .src = "raw-assets/textures/UI/farm-rpg-bg.png",
+            .dst = "assets/farm-rpg-bg.png",
+            .premul = true,
+        },
+        .{ .src = "raw-assets/cursor.png", .dst = "assets/cursor.png" },
+        .{ .src = "raw-assets/icon.ico", .dst = "assets/icon.ico" },
+    });
+    assets.step.dependOn(images);
     b.getInstallStep().dependOn(&assets.step);
 
     if (web) {
@@ -58,4 +68,43 @@ pub fn build(b: *std.Build) !void {
     zhuBuild.setLibC(zhuyu, tests);
     const runTests = b.addRunArtifact(tests);
     b.step("test", "Run farm tests").dependOn(&runTests.step);
+
+    try zhuBuild.fontbm.addStep(b, zhuyu, .{
+        .font = "raw-assets/fonts/VonwaonBitmap-16px.ttf",
+        .input = "src",
+        .size = 16,
+        .maxSize = 1024,
+        .fixed = true,
+    });
+    zhuBuild.audio.addStep(b, zhuyu, .{ .rate = 11025, .quality = 0 });
+    // 兼容原始素材目录；目标已存在时保留两个文件。
+    const oldCrop = "raw-assets/farm-rpg/Farm Crops/Spring/Spring Crops.png";
+    const newCrop = "raw-assets/farm-rpg/Farm Crops/Spring Crops.png";
+    b.graph.poisonCache();
+    const oldPath = try b.root.joinString(b.allocator, oldCrop);
+    const newPath = try b.root.joinString(b.allocator, newCrop);
+    const cwd = std.Io.Dir.cwd();
+    if (cwd.renamePreserve(oldPath, cwd, newPath, b.graph.io)) |_| {
+        std.log.info("moved {s} -> {s}", .{ oldCrop, newCrop });
+    } else |err| switch (err) {
+        error.FileNotFound, error.PathAlreadyExists => {},
+        else => return err,
+    }
+    zhuBuild.atlas.addStep(b, zhuyu, .{
+        .input = "raw-assets",
+        .include = &.{
+            "circle.png",
+            "light.png",
+            "textures/",
+            "farm-rpg/",
+        },
+        .exclude = &.{
+            "textures/reserve/",
+            "farm-rpg/Farm Animals/Cow/Highlighter Cow/",
+            "textures/Tileset/wet.png",
+            "textures/UI/farm-rpg-bg.png",
+        },
+        .fixed = true,
+        .mergeFont = true,
+    });
 }
