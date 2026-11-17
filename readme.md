@@ -7,9 +7,48 @@
 
 ![游戏截图](readme.png)
 
+## 生成资产
+
+使用 Zig 0.17.1。以下命令都在项目根目录执行，首次构建会获取
+`build.zig.zon` 中指定的依赖。
+
+原始素材放在 `raw-assets/`，游戏读取生成后的 `assets/`：
+
+| 原始素材 | 用途 |
+| --- | --- |
+| `raw-assets/fonts/VonwaonBitmap-16px.ttf` | 16px 位图字体 |
+| `raw-assets/farm-rpg/`、`raw-assets/textures/` | 游戏图集，筛选规则见 `build.zig` |
+| `raw-assets/circle.png`、`raw-assets/light.png` | 图集中的绘制素材 |
+| `raw-assets/audio/` | 音乐和音效 |
+| `raw-assets/textures/UI/farm-rpg-bg.png` | 首页背景 |
+| `raw-assets/cursor.png`、`raw-assets/icon.ico` | 鼠标光标和窗口图标 |
+
+重新生成资产需要将这些工具放到 `PATH` 中：
+
+- [fontbm](https://github.com/vladimirgamalyan/fontbm)：生成位图字体，支持 Linux。
+- [FFmpeg](https://ffmpeg.org/)：音频转换，需要 `ffmpeg` 和 `ffprobe`。
+- [oxipng](https://github.com/oxipng/oxipng)：可选，检测到时自动无损优化 PNG 和 ICO。
+
+按顺序执行以下命令，先生成字体，再生成引用字体图片的图集，最后转换音频：
+
+```sh
+zig build fontbm
+zig build atlas
+zig build audio
+```
+
+| 命令 | 当前配置及输出 |
+| --- | --- |
+| `fontbm` | 从 `src/` 和引擎统计界面收集字符，补齐可打印 ASCII；输出固定 1024×1024 的无抗锯齿位图到 `assets/font/`，更新 `src/zon/font.zon` |
+| `atlas` | 筛选图片并预乘 Alpha，生成固定 1024×1024 的图集到 `assets/atlas/`，更新 `src/zon/atlas.zon`，同时引用字体页面 |
+| `audio` | 输出到 `assets/audio/`，采样率 11025Hz，Vorbis 质量 0 |
+
+这三个生成命令会清空各自的输出目录后重建。修改源码中的文字后，依次运行
+`fontbm`、`atlas`；修改图集素材后运行 `atlas`；修改音频后运行 `audio`。
+
 ## 构建与运行
 
-使用 Zig 0.17.1，在项目目录执行：
+已准备好资产后，直接运行游戏：
 
 ```sh
 zig build run
@@ -24,11 +63,15 @@ zig build test
 
 原生产物位于 `zig-out/bin/`，包括可执行文件 `demo` 和 `assets/`。
 
+发布构建：
+
 ```sh
 zig build -Doptimize=fast
 ```
 
-Web 构建需先安装 Emscripten，产物位于 `zig-out/web/`：
+### Web
+
+先安装 Emscripten，再构建。产物位于 `zig-out/web/`：
 
 ```sh
 zig build install-emsdk -Dtarget=wasm32-emscripten
