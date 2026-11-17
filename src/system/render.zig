@@ -18,7 +18,7 @@ pub fn update(world: *ecs.World) void {
 }
 
 pub fn draw(world: *ecs.World) void {
-    world.sort(Render, lessThan);
+    world.sort(Render, {}, lessThan);
 
     const viewport = zhu.camera.mainWorldRect();
     var query = world.queryBy(Render, .{ Position, Sprite }, .{Hidden});
@@ -39,7 +39,7 @@ pub fn draw(world: *ecs.World) void {
     }
 }
 
-pub fn lessThan(lhs: Render, rhs: Render) bool {
+pub fn lessThan(_: void, lhs: Render, rhs: Render) bool {
     if (lhs.layer == rhs.layer) return lhs.depth < rhs.depth;
     return @backingInt(lhs.layer) < @backingInt(rhs.layer);
 }
@@ -50,9 +50,9 @@ test "渲染排序先比较图层再比较深度" {
     const actorBack = Render{ .layer = .actor, .depth = 8 };
     const actorFront = Render{ .layer = .actor, .depth = 16 };
 
-    try std.testing.expect(lessThan(ground, crop));
-    try std.testing.expect(lessThan(actorBack, actorFront));
-    try std.testing.expect(!lessThan(actorFront, actorBack));
+    try std.testing.expect(lessThan({}, ground, crop));
+    try std.testing.expect(lessThan({}, actorBack, actorFront));
+    try std.testing.expect(!lessThan({}, actorFront, actorBack));
 }
 
 test "YSort 会把位置 y 写入渲染深度" {
