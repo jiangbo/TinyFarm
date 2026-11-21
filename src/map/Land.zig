@@ -3,11 +3,11 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
-const tiled = zhu.extend.tiled;
+const Grid = zhu.extend.grid.Grid;
 
 const Land = @This();
 
-grid: tiled.Grid = undefined,
+grid: Grid = undefined,
 tiles: []Tile = &.{},
 
 const Object = struct {
@@ -32,7 +32,7 @@ pub const Tile = struct {
     }
 };
 
-pub fn init(gpa: zhu.Allocator, grid: tiled.Grid) Land {
+pub fn init(gpa: zhu.Allocator, grid: Grid) Land {
     var self = Land{ .grid = grid };
     self.tiles = gpa.alloc(Tile, grid.count()) catch zhu.oom();
     @memset(self.tiles, .{});
@@ -95,7 +95,7 @@ fn appendVertex(position: zhu.Vector2, image: zhu.Image) void {
 }
 
 test "锄地会记录目标格" {
-    const grid = tiled.Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -105,7 +105,7 @@ test "锄地会记录目标格" {
 }
 
 test "浇水只会影响已有耕地" {
-    const grid = tiled.Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -118,7 +118,7 @@ test "浇水只会影响已有耕地" {
 }
 
 test "目标格有作物时不会锄地" {
-    const grid = tiled.Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -129,7 +129,7 @@ test "目标格有作物时不会锄地" {
 }
 
 test "锄地要求地块为空" {
-    const grid = tiled.Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -146,7 +146,7 @@ test "锄地要求地块为空" {
 }
 
 test "种植只要求已有耕地且没有对象" {
-    const grid = tiled.Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -163,7 +163,7 @@ test "种植只要求已有耕地且没有对象" {
 }
 
 test "浇水要求已有耕地" {
-    const grid = tiled.Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 

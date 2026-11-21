@@ -4,7 +4,7 @@ const ecs = @import("ecs");
 
 const component = @import("../component.zig");
 
-const Grid = zhu.extend.tiled.Grid;
+const Grid = zhu.extend.grid.Grid;
 const Position = component.Position;
 const Shape = component.motion.Shape;
 const Blocking = component.motion.Blocking;
@@ -133,13 +133,13 @@ pub fn isBlocked(self: Spatial, position: zhu.Vector2, collider: Shape) bool {
     const mapBounds = zhu.Rect.init(.zero, self.grid.size());
     if (!mapBounds.contains(bounds)) return true;
 
-    var iter = self.grid.cellsInRect(bounds);
+    var iter = self.grid.indicesInRect(bounds);
     while (iter.next()) |index| {
         const marks = self.tiles[index];
         const tileRect = self.grid.indexToRect(index);
         if (marks.supersetOf(solid)) {
             // 精确检测：圆形用圆-矩形相交，矩形用矩形相交
-            if (shape.intersect(tileRect)) return true;
+            if (shape.intersect(.{ .rect = tileRect })) return true;
             continue;
         }
 
@@ -149,25 +149,25 @@ pub fn isBlocked(self: Spatial, position: zhu.Vector2, collider: Shape) bool {
         const pos = tileRect.min;
         if (marks.contains(.north)) {
             const rect = zhu.Rect.init(pos, .xy(size, half));
-            if (shape.intersect(rect)) return true;
+            if (shape.intersect(.{ .rect = rect })) return true;
         }
         if (marks.contains(.south)) {
             const rect = zhu.Rect.init(pos.addY(half), .xy(size, half));
-            if (shape.intersect(rect)) return true;
+            if (shape.intersect(.{ .rect = rect })) return true;
         }
         if (marks.contains(.west)) {
             const rect = zhu.Rect.init(pos, .xy(half, size));
-            if (shape.intersect(rect)) return true;
+            if (shape.intersect(.{ .rect = rect })) return true;
         }
         if (marks.contains(.east)) {
             const rect = zhu.Rect.init(pos.addX(half), .xy(half, size));
-            if (shape.intersect(rect)) return true;
+            if (shape.intersect(.{ .rect = rect })) return true;
         }
     }
 
     // 精确碰撞检测：用 Shape.intersect 与区域矩形相交
     for (self.areas.items) |area| {
-        if (shape.intersect(area)) return true;
+        if (shape.intersect(.{ .rect = area })) return true;
     }
     return false;
 }

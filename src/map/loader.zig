@@ -268,7 +268,7 @@ fn appendVertex(ctx: *Context, position: zhu.Vector2, image: zhu.Image) void {
 
 // 对象层产出按碰撞范围登记；没有碰撞范围时退回到传入矩形。
 fn setProductTiles(ctx: *Context, entity: ecs.Entity, rect: zhu.Rect) void {
-    var iter = ctx.map.grid.cellsInRect(rect);
+    var iter = ctx.map.grid.indicesInRect(rect);
     while (iter.next()) |index| {
         ctx.loaded.land.tiles[index].set(.product, entity);
     }

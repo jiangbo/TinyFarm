@@ -66,7 +66,7 @@ fn markFacingHits(world: *World) void {
     while (query.next()) |row| {
         const position = row.get(Position);
         const body = row.get(Shape);
-        if (body.move(position).intersect(rect)) {
+        if (body.move(position).intersect(Shape{ .rect = rect })) {
             query.add(world, row.entity, Hit{});
         }
     }

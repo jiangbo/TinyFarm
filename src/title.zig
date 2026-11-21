@@ -34,7 +34,7 @@ pub fn enter() void {
 }
 
 pub fn exit() void {
-    zhu.audio.setMusicState(.stopped);
+    zhu.audio.stopMusic(0);
 }
 
 pub fn update(delta: f32) ?Request {

@@ -34,7 +34,7 @@ pub const maps = tiled.bind(@import("zon/map/tileSet.zon"), &.{
 });
 
 pub var current: Id = .school;
-pub var grid: tiled.Grid = maps[0].grid;
+pub var grid: zhu.extend.grid.Grid = maps[0].grid;
 var mapImage: zhu.Image = undefined;
 var dryLandImage: zhu.Image = undefined;
 var wetLandImage: zhu.Image = undefined;
