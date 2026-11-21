@@ -31,16 +31,6 @@ pub fn build(b: *std.Build) !void {
         .install_dir = if (web) .prefix else .bin,
         .install_subdir = if (web) "web/assets" else "assets",
     });
-    const images = zhuBuild.copy.addStep(b, zhuyu, &.{
-        .{
-            .src = "raw-assets/textures/UI/farm-rpg-bg.png",
-            .dst = "assets/farm-rpg-bg.png",
-            .premul = true,
-        },
-        .{ .src = "raw-assets/cursor.png", .dst = "assets/cursor.png" },
-        .{ .src = "raw-assets/icon.ico", .dst = "assets/icon.ico" },
-    });
-    assets.step.dependOn(images);
     b.getInstallStep().dependOn(&assets.step);
 
     if (web) {
@@ -107,4 +97,13 @@ pub fn build(b: *std.Build) !void {
         .fixed = true,
         .mergeFont = true,
     });
+    zhuBuild.copy.addStep(b, zhuyu, .{ .items = &.{
+        .{
+            .src = "raw-assets/textures/UI/farm-rpg-bg.png",
+            .dst = "assets/farm-rpg-bg.png",
+            .premul = true,
+        },
+        .{ .src = "raw-assets/cursor.png", .dst = "assets/cursor.png" },
+        .{ .src = "raw-assets/icon.ico", .dst = "assets/icon.ico" },
+    } });
 }
