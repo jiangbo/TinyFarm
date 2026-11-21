@@ -28,13 +28,13 @@ pub fn init() void {
 
 pub fn enter() void {
     zhu.camera.main = .window;
-    zhu.audio.playMusic("audio/02_spring_fairy_tale.ogg");
+    zhu.music.play("audio/02_spring_fairy_tale.ogg");
     elapsed = 0;
     popup = null;
 }
 
 pub fn exit() void {
-    zhu.audio.stopMusic(0);
+    zhu.music.stop(0);
 }
 
 pub fn update(delta: f32) ?Request {

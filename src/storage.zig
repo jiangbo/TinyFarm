@@ -89,8 +89,8 @@ pub fn update(world: *World, cfg: Config) void {
 
 fn sync(world: *World, cfg: Config) void {
     world.getResourcePtr(Speed).?.value = cfg.speed;
-    zhu.audio.musicVolume.store(cfg.music, .release);
-    zhu.audio.soundVolume.store(cfg.sound, .release);
+    zhu.music.setVolume(cfg.music);
+    zhu.sound.setVolume(cfg.sound);
 }
 
 pub fn read(slot: u8) !zhu.storage.Loaded(Record) {

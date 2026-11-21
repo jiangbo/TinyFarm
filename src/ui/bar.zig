@@ -40,7 +40,7 @@ pub fn update(inv: *Inventory) void {
 
     if (click.update(hover())) |index| {
         inv.activeHotbar = index;
-        zhu.audio.playSound("audio/UI_button08.ogg");
+        zhu.sound.play("audio/UI_button08.ogg");
     }
     if (click.captured) input.mouseCaptured = true;
 }

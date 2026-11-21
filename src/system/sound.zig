@@ -16,7 +16,7 @@ pub fn update(world: *ecs.World) void {
 
 fn playEvents(world: *ecs.World) void {
     const sounds = world.getEvent(event.SoundPlay);
-    for (sounds) |evt| zhu.audio.playSound(path(evt.id));
+    for (sounds) |evt| zhu.sound.play(path(evt.id));
     world.clearEvent(event.SoundPlay);
 }
 
@@ -33,7 +33,7 @@ fn playEntities(world: *ecs.World) void {
         const offset = (position.x - center.x) / halfWidth;
         const pan = std.math.clamp(offset, -1, 1);
 
-        _ = zhu.audio.playSoundOption(path(id), .{
+        _ = zhu.sound.playOption(path(id), .{
             .left = 1 - @max(pan, 0),
             .right = 1 + @min(pan, 0),
         });

@@ -200,7 +200,7 @@ fn enterPlay(loadSlot: ?u8) void {
             title.enter();
             return;
         }
-        zhu.audio.playMusic("audio/01_spring_journey.ogg");
+        zhu.music.play("audio/01_spring_journey.ogg");
         return;
     }
 
@@ -220,7 +220,7 @@ fn enterPlay(loadSlot: ?u8) void {
     _ = inv.add(.pickaxe, 1);
     _ = inv.add(.axe, 1);
     _ = inv.add(.sickle, 1);
-    zhu.audio.playMusic("audio/01_spring_journey.ogg");
+    zhu.music.play("audio/01_spring_journey.ogg");
 }
 
 fn save(slot: u8) bool {
