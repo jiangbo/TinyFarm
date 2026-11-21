@@ -5,6 +5,8 @@ const ecs = @import("ecs");
 const component = @import("../component.zig");
 
 const Grid = zhu.extend.grid.Grid;
+const SolidMask = zhu.extend.grid.SolidMask;
+const Vector2 = zhu.Vector2;
 const Position = component.Position;
 const Shape = component.motion.Shape;
 const Blocking = component.motion.Blocking;
@@ -16,10 +18,6 @@ const Spatial = @This();
 
 // 当前地图每个瓦片上的语义标记，可组合使用。
 pub const Mark = enum {
-    north, // 北面阻挡
-    south, // 南面阻挡
-    west, // 西面阻挡
-    east, // 东面阻挡
     hazard, // 危险区域
     water, // 水域
     interact, // 可交互
@@ -28,87 +26,39 @@ pub const Mark = enum {
 };
 
 pub const Marks = std.EnumSet(Mark);
-const solid = Marks.initMany(&.{ .north, .south, .west, .east });
 
 grid: Grid = undefined,
+mask: SolidMask = undefined,
 tiles: []Marks = &.{},
 areas: std.ArrayList(zhu.Rect) = .empty,
 
 pub fn init(gpa: zhu.Allocator, grid: Grid) Spatial {
-    var self = Spatial{ .grid = grid };
+    var self = Spatial{
+        .grid = grid,
+        .mask = SolidMask.init(gpa, .{
+            .width = grid.width * 2,
+            .height = grid.height * 2,
+            .cell = @divExact(grid.cell, 2),
+        }) catch zhu.oom(),
+    };
     self.tiles = gpa.alloc(Marks, self.grid.count()) catch zhu.oom();
     @memset(self.tiles, Marks.empty);
     return self;
 }
 
 pub fn deinit(self: *Spatial, gpa: zhu.Allocator) void {
+    self.mask.deinit(gpa);
     gpa.free(self.tiles);
     self.areas.clearAndFree(gpa);
 }
 
-pub fn setTileBlock(self: *Spatial, index: usize) void {
-    self.tiles[index].setUnion(solid);
-}
-
-/// 根据 tile_flag 字符串设置瓦片标记
-pub fn setTileFlag(self: *Spatial, index: usize, flag: []const u8) void {
-    var iter = std.mem.tokenizeScalar(u8, flag, ',');
-    while (iter.next()) |raw| {
-        const token = std.mem.trim(u8, raw, " \t\r\n");
-        if (std.mem.eql(u8, token, "SOLID")) {
-            self.tiles[index].setUnion(solid);
-        } else if (std.mem.eql(u8, token, "BLOCK_N")) {
-            self.tiles[index].insert(.north);
-        } else if (std.mem.eql(u8, token, "BLOCK_S")) {
-            self.tiles[index].insert(.south);
-        } else if (std.mem.eql(u8, token, "BLOCK_W")) {
-            self.tiles[index].insert(.west);
-        } else if (std.mem.eql(u8, token, "BLOCK_E")) {
-            self.tiles[index].insert(.east);
-        } else if (std.mem.eql(u8, token, "HAZARD")) {
-            self.tiles[index].insert(.hazard);
-        } else if (std.mem.eql(u8, token, "WATER")) {
-            self.tiles[index].insert(.water);
-        } else if (std.mem.eql(u8, token, "INTERACT")) {
-            self.tiles[index].insert(.interact);
-        } else if (std.mem.eql(u8, token, "ARABLE")) {
-            self.tiles[index].insert(.arable);
-        } else if (std.mem.eql(u8, token, "OCCUPIED")) {
-            self.tiles[index].insert(.occupied);
-        } else {
-            std.debug.panic("unknown tile_flag token: {s}", .{token});
-        }
-    }
-}
-
-pub fn clearTileMark(self: *Spatial, index: usize, mark: Mark) void {
-    self.tiles[index].remove(mark);
-}
-
-pub fn clearTileBlock(self: *Spatial, index: usize) void {
-    self.tiles[index].remove(.north);
-    self.tiles[index].remove(.south);
-    self.tiles[index].remove(.west);
-    self.tiles[index].remove(.east);
-}
-
-pub fn marksAt(self: Spatial, position: zhu.Vector2) Marks {
-    const index = self.grid.worldToIndex(position);
-    return self.tiles[index orelse return .empty];
-}
-
-pub fn hasAnyBlock(marks: Marks) bool {
-    return marks.contains(.north) or marks.contains(.south) or
-        marks.contains(.west) or marks.contains(.east);
-}
-
 pub fn canHoeTile(self: Spatial, position: zhu.Vector2) bool {
-    const marks = self.marksAt(position);
+    const index = self.grid.worldToIndex(position) orelse return false;
+    const marks = self.tiles[index];
     if (!marks.contains(.arable)) return false;
     if (marks.contains(.water)) return false;
     if (marks.contains(.occupied)) return false;
-    if (hasAnyBlock(marks)) return false;
-    return true;
+    return !self.mask.overlaps(.{ .rect = self.grid.indexToRect(index) });
 }
 
 pub fn addSolidRect(self: *Spatial, gpa: zhu.Allocator, rect: zhu.Rect) void {
@@ -125,49 +75,16 @@ pub fn clearSolidRange(self: *Spatial, range: SolidRange) void {
     for (self.solidAreas(range)) |*area| area.* = .init(.zero, .zero);
 }
 
-/// 检查碰撞体放在指定位置后是否被阻挡
-pub fn isBlocked(self: Spatial, position: zhu.Vector2, collider: Shape) bool {
-    // 将碰撞体偏移到绝对位置
+/// 检查碰撞体放在指定位置后是否被阻挡。
+pub fn isBlocked(self: Spatial, position: Vector2, collider: Shape) bool {
     const shape = collider.move(position);
     const bounds = shape.toRect();
-    const mapBounds = zhu.Rect.init(.zero, self.grid.size());
-    if (!mapBounds.contains(bounds)) return true;
+    if (!zhu.Rect.init(.zero, self.grid.size()).contains(bounds)) return true;
+    if (self.mask.overlaps(shape)) return true;
 
-    var iter = self.grid.indicesInRect(bounds);
-    while (iter.next()) |index| {
-        const marks = self.tiles[index];
-        const tileRect = self.grid.indexToRect(index);
-        if (marks.supersetOf(solid)) {
-            // 精确检测：圆形用圆-矩形相交，矩形用矩形相交
-            if (shape.intersect(.{ .rect = tileRect })) return true;
-            continue;
-        }
-
-        // 方向标记表示半格阻挡，目标碰撞体进入半格区域就被挡住。
-        const size = tileRect.size.x;
-        const half = size * 0.5;
-        const pos = tileRect.min;
-        if (marks.contains(.north)) {
-            const rect = zhu.Rect.init(pos, .xy(size, half));
-            if (shape.intersect(.{ .rect = rect })) return true;
-        }
-        if (marks.contains(.south)) {
-            const rect = zhu.Rect.init(pos.addY(half), .xy(size, half));
-            if (shape.intersect(.{ .rect = rect })) return true;
-        }
-        if (marks.contains(.west)) {
-            const rect = zhu.Rect.init(pos, .xy(half, size));
-            if (shape.intersect(.{ .rect = rect })) return true;
-        }
-        if (marks.contains(.east)) {
-            const rect = zhu.Rect.init(pos.addX(half), .xy(half, size));
-            if (shape.intersect(.{ .rect = rect })) return true;
-        }
-    }
-
-    // 精确碰撞检测：用 Shape.intersect 与区域矩形相交
     for (self.areas.items) |area| {
-        if (shape.intersect(.{ .rect = area })) return true;
+        if (area.size.x <= 0 or area.size.y <= 0) continue;
+        if (shape.intersect(Shape{ .rect = area })) return true;
     }
     return false;
 }
@@ -203,55 +120,9 @@ test "isBlocked 检测碰撞框是否与 solid 格子重叠" {
     try std.testing.expect(!spatial.isBlocked(.xy(24, 40), collider));
 
     // 标记 tile (1,2) 为 solid
-    spatial.tiles[spatial.grid.worldToIndex(.xy(24, 40)).?].setUnion(solid);
+    spatial.addSolidRect(std.testing.allocator, grid.indexToRect(21));
     try std.testing.expect(spatial.isBlocked(.xy(24, 40), collider));
     try std.testing.expect(!spatial.isBlocked(.xy(80, 80), collider));
-}
-
-test "isBlocked 方向标记会阻挡对应半格" {
-    const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(std.testing.allocator, grid);
-    defer spatial.deinit(std.testing.allocator);
-
-    const collider: Shape = .{
-        .rect = .init(.zero, .xy(10, 6)),
-    };
-    const index = spatial.grid.worldToIndex(.xy(40, 40)).?;
-    spatial.tiles[index].insert(.north); // 上半格阻挡
-
-    try std.testing.expect(!spatial.isBlocked(.xy(36, 26), collider));
-    try std.testing.expect(spatial.isBlocked(.xy(36, 27), collider));
-    try std.testing.expect(!spatial.isBlocked(.xy(36, 41), collider));
-}
-
-test "isBlocked 支持南侧半格阻挡" {
-    const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(std.testing.allocator, grid);
-    defer spatial.deinit(std.testing.allocator);
-
-    const collider: Shape = .{
-        .rect = .init(.zero, .xy(8, 8)),
-    };
-    const index = spatial.grid.worldToIndex(.xy(40, 24)).?;
-    spatial.tiles[index].insert(.south);
-
-    try std.testing.expect(!spatial.isBlocked(.xy(36, 15), collider));
-    try std.testing.expect(spatial.isBlocked(.xy(36, 17), collider));
-}
-
-test "isBlocked 支持东侧半格阻挡" {
-    const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(std.testing.allocator, grid);
-    defer spatial.deinit(std.testing.allocator);
-
-    const collider: Shape = .{
-        .rect = .init(.zero, .xy(8, 8)),
-    };
-    const index = spatial.grid.worldToIndex(.xy(24, 40)).?;
-    spatial.tiles[index].insert(.east);
-
-    try std.testing.expect(!spatial.isBlocked(.xy(15, 36), collider));
-    try std.testing.expect(spatial.isBlocked(.xy(17, 36), collider));
 }
 
 test "isBlocked 不会把贴边当成碰撞" {
@@ -259,7 +130,7 @@ test "isBlocked 不会把贴边当成碰撞" {
     var spatial = Spatial.init(std.testing.allocator, grid);
     defer spatial.deinit(std.testing.allocator);
 
-    spatial.tiles[spatial.grid.worldToIndex(.xy(40, 40)).?].setUnion(solid);
+    spatial.addSolidRect(std.testing.allocator, grid.indexToRect(22));
     const collider: Shape = .{
         .rect = .init(.zero, .xy(10, 6)),
     };
@@ -327,39 +198,6 @@ test "对象 collider 使用精确矩形保留桌子间通道" {
     try std.testing.expect(spatial.isBlocked(.xy(96, 120), collider));
 }
 
-test "setTileFlag 支持地图语义标记" {
-    const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(std.testing.allocator, grid);
-    defer spatial.deinit(std.testing.allocator);
-
-    const position = zhu.Vector2.xy(24, 40);
-    const index = spatial.grid.worldToIndex(position).?;
-
-    spatial.setTileFlag(index, "ARABLE,OCCUPIED,WATER,HAZARD,INTERACT");
-
-    const marks = spatial.marksAt(position);
-    try std.testing.expect(marks.contains(.arable));
-    try std.testing.expect(marks.contains(.occupied));
-    try std.testing.expect(marks.contains(.water));
-    try std.testing.expect(marks.contains(.hazard));
-    try std.testing.expect(marks.contains(.interact));
-}
-
-test "setTileFlag 支持 SOLID 与其它标记组合" {
-    const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
-    var spatial = Spatial.init(std.testing.allocator, grid);
-    defer spatial.deinit(std.testing.allocator);
-
-    const position = zhu.Vector2.xy(24, 40);
-    const index = spatial.grid.worldToIndex(position).?;
-
-    spatial.setTileFlag(index, "SOLID,ARABLE");
-
-    const marks = spatial.marksAt(position);
-    try std.testing.expect(hasAnyBlock(marks));
-    try std.testing.expect(marks.contains(.arable));
-}
-
 test "canHoeTile 要求可耕作且没有地图阻挡语义" {
     const grid = Grid{ .width = 10, .height = 12, .cell = 16 };
     var spatial = Spatial.init(std.testing.allocator, grid);
@@ -381,7 +219,7 @@ test "canHoeTile 要求可耕作且没有地图阻挡语义" {
     try std.testing.expect(!spatial.canHoeTile(position));
     spatial.tiles[index].remove(.occupied);
 
-    spatial.tiles[index].insert(.north);
+    spatial.mask.setCellsInRect(grid.indexToRect(index), true);
     try std.testing.expect(!spatial.canHoeTile(position));
 }
 
@@ -400,7 +238,7 @@ test "isBlocked 圆形碰撞体检测 solid 瓦片" {
     );
 
     // solid 格子碰撞
-    spatial.tiles[spatial.grid.worldToIndex(.xy(24, 40)).?].setUnion(solid);
+    spatial.addSolidRect(std.testing.allocator, grid.indexToRect(21));
     try std.testing.expect(
         spatial.isBlocked(.xy(24, 40), collider),
     );

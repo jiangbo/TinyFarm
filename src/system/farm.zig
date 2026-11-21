@@ -450,8 +450,8 @@ test "错误工具不会命中产出对象" {
     try std.testing.expectEqual(0, world.getEvent(event.SoundPlay).len);
 }
 
-test "镐子击碎石头会生成掉落并清理阻挡" {
-    const target = zhu.Vector2.xy(48, 48);
+test "镐子击碎石头会生成掉落" {
+    const target = zhu.Vector2.xy(32, 48);
     zhu.random.init(1);
     var world = World.init(std.testing.allocator);
     defer world.deinit();
@@ -472,7 +472,6 @@ test "镐子击碎石头会生成掉落并清理阻挡" {
 
     try std.testing.expectEqual(null, map.getTile(target).?.get(.product));
     try std.testing.expect(!world.has(entity, Product));
-    try std.testing.expect(!map.hasAnyBlockAt(target.add(.xy(1, 1))));
 
     const pickups = world.values(Pickup);
     try std.testing.expectEqual(1, pickups.len);

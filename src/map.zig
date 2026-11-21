@@ -148,10 +148,6 @@ pub fn getTile(position: zhu.Vector2) ?*Land.Tile {
     return loaded.land.getTile(position);
 }
 
-pub fn hasAnyBlockAt(position: zhu.Vector2) bool {
-    return Spatial.hasAnyBlock(loaded.spatial.marksAt(position));
-}
-
 pub fn canMove(world: *World, entity: ecs.Entity, to: zhu.Vector2) bool {
     return loaded.spatial.canMove(world, entity, to);
 }
@@ -283,11 +279,8 @@ fn restoreObject(world: *World, index: usize, data: Object) void {
 fn clearProductIndex(world: *World, index: usize) void {
     const object = loaded.land.tiles[index].object.?;
     std.debug.assert(object.kind == .product);
-    // 对象层产出会注册精确碰撞矩形；tile 层产出只写瓦片阻挡。
     if (world.get(object.entity, component.map.SolidRange)) |range| {
         loaded.spatial.clearSolidRange(range);
-    } else {
-        loaded.spatial.clearTileBlock(index);
     }
     world.destroyEntity(object.entity);
     clearProductTiles(object.entity);
@@ -559,7 +552,7 @@ test "恢复地图产出对象只写回生命" {
     try std.testing.expectEqual(4, health.value);
 }
 
-test "恢复 gone 会删除默认产出对象并清 tile 阻挡" {
+test "恢复 gone 只清除产出对象自己的碰撞矩形" {
     loaded.land = Land.init(std.testing.allocator, maps[0].grid);
     defer loaded.land.deinit(std.testing.allocator);
     loaded.spatial = Spatial.init(std.testing.allocator, maps[0].grid);
@@ -572,17 +565,25 @@ test "恢复 gone 会删除默认产出对象并清 tile 阻挡" {
     world.add(entity, item.Product{ .value = .one(.stone) });
     world.add(entity, item.Health{ .value = 1 });
     loaded.land.tiles[0].object = .{ .kind = .product, .entity = entity };
-    loaded.spatial.setTileFlag(0, "SOLID");
+    const rock = zhu.Rect.init(.xy(4, 0), .xy(4, 16));
+    const terrain = zhu.Rect.init(.xy(8, 0), .xy(8, 16));
+    loaded.spatial.addSolidRect(std.testing.allocator, rock);
+    loaded.spatial.addSolidRect(std.testing.allocator, terrain);
+    world.add(entity, component.map.SolidRange{ .start = 0, .count = 1 });
+
+    const mover = world.createEntity();
+    world.add(mover, Position.zero);
+    world.add(mover, motion.Shape{ .rect = .init(.zero, .one) });
+    try std.testing.expect(!canMove(&world, mover, .xy(4, 0)));
 
     restoreObject(&world, 0, .gone);
 
-    const position = maps[0].grid.indexToWorld(0).add(.xy(1, 1));
     try std.testing.expectEqual(null, loaded.land.tiles[0].object);
     try std.testing.expectEqual(.product, loaded.land.tiles[0].gone);
     try std.testing.expect(!world.has(entity, item.Product));
-    try std.testing.expect(!Spatial.hasAnyBlock(
-        loaded.spatial.marksAt(position),
-    ));
+    try std.testing.expectEqual(zhu.Vector2.zero, loaded.spatial.areas.items[0].size);
+    try std.testing.expect(canMove(&world, mover, .xy(4, 0)));
+    try std.testing.expect(!canMove(&world, mover, .xy(8, 0)));
 }
 
 test "对象层产出对象按碰撞范围占用格子" {

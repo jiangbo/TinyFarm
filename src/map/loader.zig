@@ -77,27 +77,28 @@ fn parseLayers(ctx: *Context) void {
 }
 
 fn parseSolidLayer(ctx: *Context, layer: *const tiled.Layer) void {
+    const mask = &ctx.loaded.spatial.mask;
     for (layer.data, 0..) |gid, index| {
-        if (gid != 0) ctx.loaded.spatial.setTileBlock(index);
+        if (gid != 0) mask.setCellsInRect(ctx.map.grid.indexToRect(index), true);
     }
 }
 
 fn parseTileLayer(ctx: *Context, layer: *const tiled.Layer) void {
+    const rockLayer = layer.isNamed("rock");
     for (layer.data, 0..) |globalId, index| {
         if (globalId == 0) continue; // 0 表示空瓦片，跳过
 
-        if (layer.isNamed("rock")) {
+        if (rockLayer) {
             loadRockTile(ctx, globalId, index);
-        } else {
-            if (ctx.map.getImage(globalId)) |image| {
-                appendVertex(ctx, ctx.map.grid.indexToWorld(index), image);
-            }
+            continue;
+        }
+        if (ctx.map.getImage(globalId)) |image| {
+            appendVertex(ctx, ctx.map.grid.indexToWorld(index), image);
         }
 
-        // 带 tile_flag 标记的瓦片设置方向碰撞
         const tile = ctx.map.getTile(globalId) orelse continue;
         if (tile.getProperty("tile_flag", []const u8)) |flag| {
-            ctx.loaded.spatial.setTileFlag(index, flag);
+            loadFlags(ctx, index, flag);
         }
     }
 }
@@ -108,7 +109,55 @@ fn loadRockTile(ctx: *Context, globalId: u32, index: usize) void {
     if (!ctx.world.has(entity, item.Product)) return;
     std.debug.assert(ctx.world.has(entity, item.Health));
 
+    const spatial = &ctx.loaded.spatial;
+    const start = spatial.areas.items.len;
+    spatial.addSolidRect(ctx.gpa, ctx.map.grid.indexToRect(index));
+    ctx.world.add(entity, SolidRange{ .start = start, .count = 1 });
     ctx.loaded.land.tiles[index].set(.product, entity);
+}
+
+const TileFlag = enum {
+    SOLID,
+    BLOCK_N,
+    BLOCK_S,
+    BLOCK_W,
+    BLOCK_E,
+    HAZARD,
+    WATER,
+    INTERACT,
+    ARABLE,
+    OCCUPIED,
+};
+
+fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
+    const spatial = &ctx.loaded.spatial;
+    const tile = ctx.map.grid.indexToRect(index);
+    const half = tile.size.x * 0.5;
+    var iter = std.mem.tokenizeScalar(u8, flags, ',');
+    while (iter.next()) |raw| {
+        const token = std.mem.trim(u8, raw, " \t\r\n");
+        const flag = std.meta.stringToEnum(TileFlag, token) orelse
+            std.debug.panic("unknown tile_flag token: {s}", .{token});
+        const rect: zhu.Rect = switch (flag) {
+            .SOLID => tile,
+            .BLOCK_N => .init(tile.min, .xy(tile.size.x, half)),
+            .BLOCK_S => .init(tile.min.addY(half), .xy(tile.size.x, half)),
+            .BLOCK_W => .init(tile.min, .xy(half, tile.size.y)),
+            .BLOCK_E => .init(tile.min.addX(half), .xy(half, tile.size.y)),
+            else => {
+                spatial.tiles[index].insert(switch (flag) {
+                    .HAZARD => .hazard,
+                    .WATER => .water,
+                    .INTERACT => .interact,
+                    .ARABLE => .arable,
+                    .OCCUPIED => .occupied,
+                    else => unreachable,
+                });
+                continue;
+            },
+        };
+        spatial.mask.setCellsInRect(rect, true);
+    }
 }
 
 fn parseImageLayer(ctx: *Context, layer: *const tiled.Layer) void {
@@ -412,4 +461,7 @@ test "加载地图产出对象会按对象和 rock 图层写入目标格" {
     try std.testing.expectEqual(.stone, rockProd.value.item);
     try std.testing.expectEqual(rockCfg.health.?, rockHp.value);
     try std.testing.expectEqual(null, loaded.land.tiles[2].object);
+    const range = world.get(rock.entity, SolidRange).?;
+    const rect = testMap.grid.indexToRect(1);
+    try std.testing.expectEqualSlices(zhu.Rect, &.{rect}, loaded.spatial.solidAreas(range));
 }
