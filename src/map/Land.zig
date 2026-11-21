@@ -3,7 +3,7 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
-const Grid = zhu.extend.grid.Grid;
+const Grid = zhu.extend.spatial.Grid;
 
 const Land = @This();
 
@@ -16,10 +16,21 @@ const Object = struct {
     entity: ecs.Entity,
 };
 
+pub const Mark = enum {
+    hazard, // 危险区域
+    water, // 水域
+    interact, // 可交互
+    arable, // 可耕作
+    occupied, // 被占用
+};
+
+pub const Marks = std.EnumSet(Mark);
+
 pub const Tile = struct {
     ground: ?component.farm.Ground = null,
     object: ?Object = null,
     gone: enum { none, product } = .none,
+    marks: Marks = .empty,
 
     pub fn get(self: Tile, kind: Object.Kind) ?ecs.Entity {
         const object = self.object orelse return null;

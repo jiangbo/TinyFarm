@@ -5,9 +5,10 @@ const ecs = @import("ecs");
 const component = @import("../component.zig");
 const factory = @import("../factory.zig");
 const Land = @import("Land.zig");
-const Spatial = @import("Spatial.zig");
 
 const tiled = zhu.extend.tiled;
+const Grid = zhu.extend.spatial.Grid;
+const SolidMask = zhu.extend.spatial.SolidMask;
 const World = ecs.World;
 const Position = component.Position;
 const actor = component.actor;
@@ -18,11 +19,44 @@ const SolidRange = component.map.SolidRange;
 const mock: []const tiled.Map = @import("../zon/map/mock.zon");
 
 pub const Loaded = struct {
-    land: Land,
-    spatial: Spatial,
+    land: Land = .{},
+    mask: SolidMask = undefined,
+    areas: std.ArrayList(zhu.Rect) = .empty,
     vertexes: std.ArrayList(zhu.Vertex) = .empty,
     frontStart: usize = 0,
     loaded: bool = false,
+
+    pub fn init(gpa: zhu.Allocator, grid: Grid) Loaded {
+        return .{
+            .land = Land.init(gpa, grid),
+            .mask = SolidMask.init(gpa, .{
+                .width = grid.width * 2,
+                .height = grid.height * 2,
+                .cell = @divExact(grid.cell, 2),
+            }) catch zhu.oom(),
+            .loaded = true,
+        };
+    }
+
+    pub fn deinit(self: *Loaded, gpa: zhu.Allocator) void {
+        if (!self.loaded) return;
+        self.land.deinit(gpa);
+        self.mask.deinit(gpa);
+        self.areas.clearAndFree(gpa);
+        self.vertexes.clearAndFree(gpa);
+        self.frontStart = 0;
+        self.loaded = false;
+    }
+
+    pub fn addSolidRect(self: *Loaded, gpa: zhu.Allocator, rect: zhu.Rect) void {
+        std.debug.assert(rect.size.x > 0 and rect.size.y > 0);
+        self.areas.append(gpa, rect) catch zhu.oom();
+    }
+
+    // SolidRange 只记录对象加入 areas 时的起点和数量。
+    pub fn solidAreas(self: Loaded, range: SolidRange) []zhu.Rect {
+        return self.areas.items[range.start..][0..range.count];
+    }
 };
 
 const Context = struct {
@@ -33,11 +67,7 @@ const Context = struct {
 };
 
 pub fn load(gpa: zhu.Allocator, world: *World, map: tiled.Map) Loaded {
-    var result = Loaded{
-        .land = Land.init(gpa, map.grid),
-        .spatial = Spatial.init(gpa, map.grid),
-        .loaded = true,
-    };
+    var result = Loaded.init(gpa, map.grid);
     var ctx = Context{
         .gpa = gpa,
         .map = map,
@@ -77,7 +107,7 @@ fn parseLayers(ctx: *Context) void {
 }
 
 fn parseSolidLayer(ctx: *Context, layer: *const tiled.Layer) void {
-    const mask = &ctx.loaded.spatial.mask;
+    const mask = &ctx.loaded.mask;
     for (layer.data, 0..) |gid, index| {
         if (gid != 0) mask.setCellsInRect(ctx.map.grid.indexToRect(index), true);
     }
@@ -109,9 +139,8 @@ fn loadRockTile(ctx: *Context, globalId: u32, index: usize) void {
     if (!ctx.world.has(entity, item.Product)) return;
     std.debug.assert(ctx.world.has(entity, item.Health));
 
-    const spatial = &ctx.loaded.spatial;
-    const start = spatial.areas.items.len;
-    spatial.addSolidRect(ctx.gpa, ctx.map.grid.indexToRect(index));
+    const start = ctx.loaded.areas.items.len;
+    ctx.loaded.addSolidRect(ctx.gpa, ctx.map.grid.indexToRect(index));
     ctx.world.add(entity, SolidRange{ .start = start, .count = 1 });
     ctx.loaded.land.tiles[index].set(.product, entity);
 }
@@ -130,7 +159,6 @@ const TileFlag = enum {
 };
 
 fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
-    const spatial = &ctx.loaded.spatial;
     const tile = ctx.map.grid.indexToRect(index);
     const half = tile.size.x * 0.5;
     var iter = std.mem.tokenizeScalar(u8, flags, ',');
@@ -145,7 +173,7 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
             .BLOCK_W => .init(tile.min, .xy(half, tile.size.y)),
             .BLOCK_E => .init(tile.min.addX(half), .xy(half, tile.size.y)),
             else => {
-                spatial.tiles[index].insert(switch (flag) {
+                ctx.loaded.land.tiles[index].marks.insert(switch (flag) {
                     .HAZARD => .hazard,
                     .WATER => .water,
                     .INTERACT => .interact,
@@ -156,7 +184,7 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
                 continue;
             },
         };
-        spatial.mask.setCellsInRect(rect, true);
+        ctx.loaded.mask.setCellsInRect(rect, true);
     }
 }
 
@@ -169,7 +197,7 @@ fn parseImageLayer(ctx: *Context, layer: *const tiled.Layer) void {
 fn parseObjectLayer(ctx: *Context, layer: *const tiled.Layer) void {
     if (layer.isNamed("collider")) {
         for (layer.objects) |object| {
-            ctx.loaded.spatial.addSolidRect(ctx.gpa, object.rect());
+            ctx.loaded.addSolidRect(ctx.gpa, object.rect());
         }
         return;
     }
@@ -262,7 +290,7 @@ fn loadProp(ctx: *Context, object: tiled.Object) void {
         std.debug.assert(ctx.world.has(entity, item.Health));
         if (solid.count != 0) {
             // 树这类对象按碰撞范围登记，不按更大的显示范围登记。
-            for (ctx.loaded.spatial.solidAreas(solid)) |area| {
+            for (ctx.loaded.solidAreas(solid)) |area| {
                 setProductTiles(ctx, entity, area);
             }
         } else {
@@ -275,7 +303,7 @@ fn loadProp(ctx: *Context, object: tiled.Object) void {
 }
 
 fn addSolidObject(ctx: *Context, object: tiled.Object) SolidRange {
-    const start = ctx.loaded.spatial.areas.items.len;
+    const start = ctx.loaded.areas.items.len;
     const tile = ctx.map.getTile(object.gid) orelse
         return .{ .start = start, .count = 0 };
     const group = tile.objectGroup orelse
@@ -284,14 +312,14 @@ fn addSolidObject(ctx: *Context, object: tiled.Object) SolidRange {
 
     for (group.objects) |local| {
         const position = topLeft.add(local.position);
-        ctx.loaded.spatial.addSolidRect(
+        ctx.loaded.addSolidRect(
             ctx.gpa,
             zhu.Rect.init(position, local.size),
         );
     }
     return .{
         .start = start,
-        .count = ctx.loaded.spatial.areas.items.len - start,
+        .count = ctx.loaded.areas.items.len - start,
     };
 }
 
@@ -328,9 +356,7 @@ test "actor 点对象会生成 NPC，player 点对象只保留标记" {
     defer world.deinit();
 
     var loaded = load(std.testing.allocator, &world, mock[0]);
-    defer loaded.land.deinit(std.testing.allocator);
-    defer loaded.spatial.deinit(std.testing.allocator);
-    defer loaded.vertexes.clearAndFree(std.testing.allocator);
+    defer loaded.deinit(std.testing.allocator);
 
     var query = world.query(.{
         Position,
@@ -357,9 +383,7 @@ test "trigger 对象会创建 ECS 触发器实体" {
     defer world.deinit();
 
     var loaded = load(std.testing.allocator, &world, mock[1]);
-    defer loaded.land.deinit(std.testing.allocator);
-    defer loaded.spatial.deinit(std.testing.allocator);
-    defer loaded.vertexes.clearAndFree(std.testing.allocator);
+    defer loaded.deinit(std.testing.allocator);
 
     var query = world.query(.{component.map.Trigger});
     const row = query.next().?;
@@ -379,9 +403,7 @@ test "rest 对象会创建可交互实体" {
     defer world.deinit();
 
     var loaded = load(std.testing.allocator, &world, mock[2]);
-    defer loaded.land.deinit(std.testing.allocator);
-    defer loaded.spatial.deinit(std.testing.allocator);
-    defer loaded.vertexes.clearAndFree(std.testing.allocator);
+    defer loaded.deinit(std.testing.allocator);
 
     var query = world.query(.{
         Position,
@@ -439,9 +461,7 @@ test "加载地图产出对象会按对象和 rock 图层写入目标格" {
     var testMap = mock[3];
     testMap.tileSets = &testTileSets;
     var loaded = load(std.testing.allocator, &world, testMap);
-    defer loaded.land.deinit(std.testing.allocator);
-    defer loaded.spatial.deinit(std.testing.allocator);
-    defer loaded.vertexes.clearAndFree(std.testing.allocator);
+    defer loaded.deinit(std.testing.allocator);
 
     const tree = loaded.land.tiles[0].object.?;
     const rock = loaded.land.tiles[1].object.?;
@@ -463,5 +483,5 @@ test "加载地图产出对象会按对象和 rock 图层写入目标格" {
     try std.testing.expectEqual(null, loaded.land.tiles[2].object);
     const range = world.get(rock.entity, SolidRange).?;
     const rect = testMap.grid.indexToRect(1);
-    try std.testing.expectEqualSlices(zhu.Rect, &.{rect}, loaded.spatial.solidAreas(range));
+    try std.testing.expectEqualSlices(zhu.Rect, &.{rect}, loaded.solidAreas(range));
 }

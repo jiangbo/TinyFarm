@@ -21,15 +21,7 @@ pub fn update(world: *World, delta: f32) void {
 
         const pos = row.getPtr(Position);
         const offset = velocity.value.scale(delta);
-
-        // 轴分离碰撞解析：先尝试 X 轴移动，再尝试 Y 轴移动。
-        // 碰撞时只回退受阻轴，这样可以沿墙滑动而不会卡死。
-        const posX = pos.addX(offset.x);
-        if (map.canMove(world, row.entity, posX)) pos.* = posX;
-
-        // Y 轴基于 X 轴已接受的位置继续检测，保持斜向移动和滑动。
-        const posY = pos.addY(offset.y);
-        if (map.canMove(world, row.entity, posY)) pos.* = posY;
+        pos.* = pos.add(map.slide(world, row.entity, offset));
     }
 
     followPlayer(world, delta);
@@ -83,31 +75,20 @@ fn addBlocker(world: *World, position: zhu.Vector2, blocking: bool) Entity {
     return entity;
 }
 
-test "动态阻挡会忽略自己" {
-    var world = World.init(std.testing.allocator);
-    defer world.deinit();
-    map.load(std.testing.allocator, &world, testMap);
-    defer map.unload(std.testing.allocator);
-
-    const entity = addMover(&world, .xy(0, 0), .xy(10, 0));
-
-    update(&world, 1);
-
-    try std.testing.expectEqual(10, world.get(entity, Position).?.x);
-}
-
 test "带 Blocking 的 Shape 会挡住移动" {
     var world = World.init(std.testing.allocator);
     defer world.deinit();
     map.load(std.testing.allocator, &world, testMap);
     defer map.unload(std.testing.allocator);
 
-    const mover = addMover(&world, .xy(0, 0), .xy(10, 0));
+    const mover = addMover(&world, .xy(0, 0), .xy(10, 5));
     _ = addBlocker(&world, .xy(10, 0), true);
 
     update(&world, 1);
 
-    try std.testing.expectEqual(0, world.get(mover, Position).?.x);
+    const position = world.get(mover, Position).?;
+    try std.testing.expectEqual(0, position.x);
+    try std.testing.expectEqual(5, position.y);
 }
 
 test "没有 Blocking 的 Shape 不会挡住移动" {
@@ -122,20 +103,4 @@ test "没有 Blocking 的 Shape 不会挡住移动" {
     update(&world, 1);
 
     try std.testing.expectEqual(10, world.get(mover, Position).?.x);
-}
-
-test "动态阻挡只回退受阻轴" {
-    var world = World.init(std.testing.allocator);
-    defer world.deinit();
-    map.load(std.testing.allocator, &world, testMap);
-    defer map.unload(std.testing.allocator);
-
-    const mover = addMover(&world, .xy(0, 0), .xy(10, 5));
-    _ = addBlocker(&world, .xy(10, 0), true);
-
-    update(&world, 1);
-
-    const position = world.get(mover, Position).?;
-    try std.testing.expectEqual(0, position.x);
-    try std.testing.expectEqual(5, position.y);
 }
