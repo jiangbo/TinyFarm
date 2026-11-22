@@ -39,8 +39,8 @@ fn useItem(world: *World, want: WantUse) void {
         },
         .water => water(world, want.target),
         .sickle => harvest(world, want.target),
-        .strawberrySeed => useSeed(world, want, .strawberry),
-        .potatoSeed => useSeed(world, want, .potato),
+        .strawberry_seed => useSeed(world, want, .strawberry),
+        .potato_seed => useSeed(world, want, .potato),
         .pickaxe, .axe => hitProduct(world, want),
         .strawberry, .potato, .timber, .stone => unreachable,
     }
@@ -236,12 +236,12 @@ test "seedPlant 会种植并扣种子" {
     defer map.unload(std.testing.allocator);
 
     const inv = testInventory(&world);
-    setActiveItem(&world, .strawberrySeed, 2);
+    setActiveItem(&world, .strawberry_seed, 2);
     try std.testing.expect(map.hoe(target));
 
     const player = world.createIdentity(Player);
     world.add(player, WantUse{
-        .item = .strawberrySeed,
+        .item = .strawberry_seed,
         .target = target,
     });
     world.add(player, UseFrame{});
@@ -274,7 +274,7 @@ test "seedPlant 没有种子时不会种植" {
 
     const player = world.createIdentity(Player);
     world.add(player, WantUse{
-        .item = .strawberrySeed,
+        .item = .strawberry_seed,
         .target = target,
     });
     world.add(player, UseFrame{});
@@ -293,11 +293,11 @@ test "seedPlant 无耕地时不扣种子" {
     defer map.unload(std.testing.allocator);
 
     const inv = testInventory(&world);
-    setActiveItem(&world, .strawberrySeed, 2);
+    setActiveItem(&world, .strawberry_seed, 2);
 
     const player = world.createIdentity(Player);
     world.add(player, WantUse{
-        .item = .strawberrySeed,
+        .item = .strawberry_seed,
         .target = target,
     });
     world.add(player, UseFrame{});
@@ -318,7 +318,7 @@ test "seedPlant 已有作物时不扣种子" {
     defer map.unload(std.testing.allocator);
 
     const inv = testInventory(&world);
-    setActiveItem(&world, .strawberrySeed, 2);
+    setActiveItem(&world, .strawberry_seed, 2);
     try std.testing.expect(map.hoe(target));
     const oldCrop = world.createEntity();
     world.add(oldCrop, Crop{ .kind = .potato });
@@ -326,7 +326,7 @@ test "seedPlant 已有作物时不扣种子" {
 
     const player = world.createIdentity(Player);
     world.add(player, WantUse{
-        .item = .strawberrySeed,
+        .item = .strawberry_seed,
         .target = target,
     });
     world.add(player, UseFrame{});

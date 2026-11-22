@@ -194,7 +194,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // strawberrySeed (index 5)，对应 CropEnum.strawberry
+        .{ // strawberry_seed (index 5)，对应 CropEnum.strawberry
             .name = "草莓种子",
             .category = "种子",
             .description = "种下后会长出草莓。",
@@ -206,7 +206,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // potatoSeed (index 6)，对应 CropEnum.potato
+        .{ // potato_seed (index 6)，对应 CropEnum.potato
             .name = "土豆种子",
             .category = "种子",
             .description = "种下后会长出土豆。",
@@ -224,7 +224,7 @@
             .description = "成熟后收获的水果。",
             .limit = 99,
             .product = .{
-                .value = .{ .item = .strawberrySeed, .count = 3 },
+                .value = .{ .item = .strawberry_seed, .count = 3 },
             },
             .icon = .{
                 // .path = "farm-rpg/Icons/Crops.png"
@@ -239,7 +239,7 @@
             .description = "成熟后收获的根茎作物。",
             .limit = 99,
             .product = .{
-                .value = .{ .item = .potatoSeed, .count = 3 },
+                .value = .{ .item = .potato_seed, .count = 3 },
             },
             .icon = .{
                 // .path = "farm-rpg/Icons/Crops.png"

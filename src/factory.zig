@@ -77,8 +77,8 @@ pub fn itemConfig(itemType: item.ItemEnum) Item {
 // 从 CropEnum 得到对应的种子 ItemEnum
 pub fn seedItem(kind: farm.CropEnum) item.ItemEnum {
     return switch (kind) {
-        .strawberry => .strawberrySeed,
-        .potato => .potatoSeed,
+        .strawberry => .strawberry_seed,
+        .potato => .potato_seed,
     };
 }
 

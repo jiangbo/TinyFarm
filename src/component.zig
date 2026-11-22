@@ -36,7 +36,8 @@ pub const render = struct {
 };
 
 pub const map = struct {
-    pub const Id = enum { school, town, exterior, interior };
+    // 枚举名与 Tiled 地图的 target_map 配置一致。
+    pub const Id = enum { school, town, home_exterior, home_interior };
     pub const StartOffset = enum { none, left, right, top, bottom };
 
     pub const Trigger = struct {
@@ -152,14 +153,15 @@ pub const ui = struct {
 };
 
 pub const item = struct {
+    // 枚举名与 Tiled 箱子配置的物品属性名一致。
     pub const ItemEnum = enum {
         hoe,
         water,
         pickaxe,
         axe,
         sickle,
-        strawberrySeed,
-        potatoSeed,
+        strawberry_seed,
+        potato_seed,
         strawberry,
         potato,
         timber,

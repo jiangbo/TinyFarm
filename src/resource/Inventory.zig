@@ -168,10 +168,10 @@ test "当前物品通过快捷栏引用读取库存槽" {
     inv.reset();
 
     inv.activeHotbar = 1;
-    inv.store.stacks[5] = .{ .item = .potatoSeed, .count = 2 };
+    inv.store.stacks[5] = .{ .item = .potato_seed, .count = 2 };
     inv.hotbar[1] = 5;
 
-    try std.testing.expectEqual(.potatoSeed, inv.active().?);
+    try std.testing.expectEqual(.potato_seed, inv.active().?);
     try std.testing.expectEqual(2, inv.store.stacks[5].count);
 
     inv.store.stacks[5].count = 0;
@@ -183,8 +183,8 @@ test "同一种物品只能绑定到一个快捷栏槽位" {
     inv.reset();
 
     // 快捷栏按物品类型唯一绑定，避免同类物品占用多个快捷键。
-    inv.store.stacks[0] = .{ .item = .strawberrySeed, .count = 2 };
-    inv.store.stacks[2] = .{ .item = .strawberrySeed, .count = 4 };
+    inv.store.stacks[0] = .{ .item = .strawberry_seed, .count = 2 };
+    inv.store.stacks[2] = .{ .item = .strawberry_seed, .count = 4 };
 
     inv.hotbarBind(0, 0);
     inv.hotbarBind(3, 2);
@@ -280,14 +280,14 @@ test "使用作物会消耗一个并产出种子" {
 
     try std.testing.expectEqual(.strawberry, inv.store.stacks[0].item);
     try std.testing.expectEqual(1, inv.store.stacks[0].count);
-    try std.testing.expectEqual(.strawberrySeed, inv.store.stacks[1].item);
+    try std.testing.expectEqual(.strawberry_seed, inv.store.stacks[1].item);
     try std.testing.expectEqual(3, inv.store.stacks[1].count);
 
     const item = switch (result) {
         .item => |value| value,
         .none, .full => return error.TestExpectedEqual,
     };
-    try std.testing.expectEqual(.strawberrySeed, item.item);
+    try std.testing.expectEqual(.strawberry_seed, item.item);
     try std.testing.expectEqual(3, item.count);
 }
 
@@ -300,16 +300,16 @@ test "使用最后一个作物会优先回填原槽" {
 
     const result = inv.useAt(0);
 
-    try std.testing.expectEqual(.potatoSeed, inv.store.stacks[0].item);
+    try std.testing.expectEqual(.potato_seed, inv.store.stacks[0].item);
     try std.testing.expectEqual(3, inv.store.stacks[0].count);
     try std.testing.expectEqual(0, inv.hotbar[0].?);
-    try std.testing.expectEqual(.potatoSeed, inv.active().?);
+    try std.testing.expectEqual(.potato_seed, inv.active().?);
 
     const item = switch (result) {
         .item => |value| value,
         .none, .full => return error.TestExpectedEqual,
     };
-    try std.testing.expectEqual(.potatoSeed, item.item);
+    try std.testing.expectEqual(.potato_seed, item.item);
     try std.testing.expectEqual(3, item.count);
 }
 
@@ -322,14 +322,14 @@ test "使用物品产物优先回到原槽而不是第一个空槽" {
     const result = inv.useAt(5);
 
     try std.testing.expectEqual(0, inv.store.stacks[0].count);
-    try std.testing.expectEqual(.potatoSeed, inv.store.stacks[5].item);
+    try std.testing.expectEqual(.potato_seed, inv.store.stacks[5].item);
     try std.testing.expectEqual(3, inv.store.stacks[5].count);
 
     const item = switch (result) {
         .item => |value| value,
         .none, .full => return error.TestExpectedEqual,
     };
-    try std.testing.expectEqual(.potatoSeed, item.item);
+    try std.testing.expectEqual(.potato_seed, item.item);
     try std.testing.expectEqual(3, item.count);
 }
 

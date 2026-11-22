@@ -142,7 +142,7 @@ test "二进制存档保留背包绑定和地图对象状态" {
         .timestamp = 123456789,
         .clock = .{ .day = 3, .hour = 19, .period = .night },
         .player = .{
-            .map = .exterior,
+            .map = .home_exterior,
             .position = .xy(32, 48),
             .facing = .left,
         },
@@ -152,7 +152,7 @@ test "二进制存档保留背包绑定和地图对象状态" {
             .hotbar = &.{ null, 0 },
         },
     };
-    record.maps.maps.set(.exterior, .{ .day = 3, .tiles = &tiles });
+    record.maps.maps.set(.home_exterior, .{ .day = 3, .tiles = &tiles });
 
     const codec = zhu.codec;
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);

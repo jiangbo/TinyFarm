@@ -179,8 +179,8 @@ fn overlayAt(hour: f32) zhu.Color {
 
 fn isOutdoor(id: MapId) bool {
     return switch (id) {
-        .town, .exterior => true,
-        .school, .interior => false,
+        .town, .home_exterior => true,
+        .school, .home_interior => false,
     };
 }
 

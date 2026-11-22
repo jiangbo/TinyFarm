@@ -205,7 +205,7 @@ fn enterPlay(loadSlot: ?u8) void {
     map.resetState();
 
     resetWorld();
-    map.enter(allocator, &world, .exterior);
+    map.enter(allocator, &world, .home_exterior);
     player.spawn(&world, -1);
     system.sort.update(&world);
     const inv = world.getResourcePtr(resource.Inventory).?;

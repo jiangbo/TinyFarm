@@ -50,13 +50,13 @@ fn updatePending(world: *ecs.World, dark: bool) void {
 fn isOutdoor(id: MapId) bool {
     // 光照系统只关心昼夜是否影响当前地图。
     return switch (id) {
-        .town, .exterior => true,
-        .school, .interior => false,
+        .town, .home_exterior => true,
+        .school, .home_interior => false,
     };
 }
 
 test "light update 夜晚启用夜灯禁用日灯" {
-    map.current = .exterior; // 设置为室外地图
+    map.current = .home_exterior; // 设置为室外地图
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
     world.addResource(Clock{ .hour = 18 });
@@ -77,7 +77,7 @@ test "light update 夜晚启用夜灯禁用日灯" {
 }
 
 test "light update 白天启用日灯禁用夜灯" {
-    map.current = .exterior; // 设置为室外地图
+    map.current = .home_exterior; // 设置为室外地图
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
     world.addResource(Clock{ .hour = 12 });
