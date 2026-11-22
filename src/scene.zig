@@ -279,19 +279,17 @@ fn restore(record: storage.Record) void {
 }
 
 fn spawnPlayer(targetId: i32) void {
-    const position = spawnPosition(targetId);
-    _ = factory.spawnPlayer(&world, position);
-    zhu.camera.directFollow(position);
-}
-
-fn spawnPosition(targetId: i32) zhu.Vector2 {
+    var position: zhu.Vector2 = .xy(311, 168);
     var query = world.query(.{Trigger});
     while (query.next()) |row| {
         const trigger = row.get(Trigger);
-        if (trigger.selfId == targetId) return triggerPosition(trigger);
+        if (trigger.selfId == targetId) {
+            position = triggerPosition(trigger);
+            break;
+        }
     }
-
-    return .xy(311, 168);
+    _ = factory.spawnPlayer(&world, position);
+    zhu.camera.directFollow(position);
 }
 
 fn triggerPosition(trigger: Trigger) zhu.Vector2 {
