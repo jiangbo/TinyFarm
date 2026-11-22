@@ -14,16 +14,6 @@ const Dialog = component.actor.Dialog;
 const Interact = component.actor.Interact;
 const Velocity = component.motion.Velocity;
 
-var bubbleImage: zhu.NineImage = undefined;
-
-pub fn init() void {
-    const image = zhu.getImage("farm-rpg/UI/dialogue box.png").?;
-    bubbleImage = zhu.NineImage.from(image, .{
-        .rect = .init(.xy(0, 48), .xy(48, 48)),
-        .patch = .{ .min = .xy(3, 4), .max = .xy(3, 3) },
-    });
-}
-
 pub fn update(world: *World) void {
     if (world.getIdentity(Dialog)) |target| {
         checkDistance(world, target);
@@ -99,32 +89,6 @@ fn closeDialog(world: *World, target: Entity) void {
 
     if (world.getPtr(target, Dialog)) |dialog| dialog.index = 0;
     world.removeIdentity(Dialog);
-}
-
-pub fn draw(world: *World) void {
-    const entity = world.getIdentity(Dialog) orelse return;
-    const dialog = world.get(entity, Dialog).?;
-    if (dialog.index >= dialog.lines.len) return;
-
-    const position = world.get(entity, Position).?;
-    const head = zhu.camera.toWindow(position.addY(-24));
-    zhu.camera.push(.window);
-    defer zhu.camera.pop();
-    drawBubble(head, dialog.lines[dialog.index]);
-}
-
-fn drawBubble(head: zhu.Vector2, text: []const u8) void {
-    // head 是 NPC 头顶的窗口坐标，气泡和文字按窗口尺寸绘制。
-    const option = zhu.text.Option{ .color = .black, .max = 144 };
-    const textSize = zhu.text.measure(text, option);
-    const size = textSize.add(.xy(16, 16)).max(.xy(160, 48));
-
-    // 对话气泡在窗口坐标取整，避免位图文字亚像素闪烁。
-    const bubblePos = head.addXY(-size.x / 2, -4 - size.y).round();
-    const bubbleRect: zhu.Rect = .init(bubblePos, size);
-    zhu.batch.drawNine(bubbleImage, bubbleRect);
-
-    zhu.text.draw(text, bubbleRect.min.add(.xy(8, 8)), option);
 }
 
 fn addTestPlayer(world: *World, position: Position) Entity {

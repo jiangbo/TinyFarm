@@ -6,6 +6,7 @@ const component = @import("component.zig");
 const input = @import("input.zig");
 const map = @import("map.zig");
 const player = @import("player.zig");
+const render = @import("render.zig");
 const storage = @import("storage.zig");
 const system = @import("system/system.zig");
 const title = @import("title.zig");
@@ -33,7 +34,6 @@ const Scene = union(enum) { title, play: ?u8 };
 
 pub var world: World = undefined;
 var allocator: zhu.Allocator = undefined;
-var canvas: zhu.graphics.RenderTarget = .{};
 var mapFade: MapFade = .{};
 var current: Scene = .title;
 var pending: ?Scene = null;
@@ -53,15 +53,12 @@ pub fn init(allocator_: zhu.Allocator) void {
     ui.init(.{ .slots = &storage.slots, .config = &config });
     title.init();
     map.init();
-
-    canvas = zhu.graphics.createRenderTarget(zhu.camera.size, .nearest);
-
-    system.init();
+    render.init();
     enterScene(current);
 }
 
 pub fn deinit() void {
-    canvas.deinit();
+    render.deinit();
     map.deinit(allocator, &world);
     ui.deinit();
     world.deinit();
@@ -89,20 +86,17 @@ pub fn update(delta: f32) void {
 }
 
 pub fn draw() void {
-    const clearColor: zhu.Color = .rgb(59, 79, 69);
     switch (current) {
         .title => {
-            zhu.batch.beginDraw(clearColor, .{});
+            zhu.batch.beginDraw(.rgb(59, 79, 69), .{});
             title.draw();
         },
         .play => {
-            zhu.batch.beginDraw(clearColor, .{ .target = &canvas });
-            drawPlay();
+            render.draw(&world);
 
-            zhu.batch.useTarget(clearColor, .{});
             zhu.camera.push(.window);
             defer zhu.camera.pop();
-            zhu.batch.drawImage(canvas.image, .zero, .{});
+            ui.draw(&world);
             if (mapFade.phase) |phase| drawMapFade(phase);
         },
     }
@@ -159,6 +153,7 @@ fn updateMapFade(delta: f32) bool {
             resetWorld();
             map.enter(allocator, &world, request.target);
             player.spawn(&world, request.targetId);
+            system.sort.update(&world);
             mapFade.phase = .in;
             mapFade.timer.restart();
         },
@@ -212,6 +207,7 @@ fn enterPlay(loadSlot: ?u8) void {
     resetWorld();
     map.enter(allocator, &world, .exterior);
     player.spawn(&world, -1);
+    system.sort.update(&world);
     const inv = world.getResourcePtr(resource.Inventory).?;
     inv.reset();
     ui.resetInventory();
@@ -271,6 +267,7 @@ fn restore(record: storage.Record) void {
     map.enter(allocator, &world, record.player.map);
     player.spawn(&world, -1);
     player.restore(&world, record.player);
+    system.sort.update(&world);
     ui.resetInventory();
     world.getResourcePtr(resource.Inventory).?.restore(record.inventory);
 }
@@ -278,20 +275,6 @@ fn restore(record: storage.Record) void {
 fn resetWorld() void {
     // 重建世界时保留全部资源。
     world.resetKeepResources();
-}
-
-fn drawPlay() void {
-    map.drawBack();
-    system.render.draw(&world);
-    map.drawFront();
-
-    system.control.draw(&world);
-    system.dialog.draw(&world);
-    system.light.draw(&world);
-
-    zhu.camera.push(.window);
-    defer zhu.camera.pop();
-    ui.draw(&world);
 }
 
 fn drawMapFade(phase: MapFade.Phase) void {

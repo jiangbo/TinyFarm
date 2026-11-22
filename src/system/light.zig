@@ -1,5 +1,4 @@
 const std = @import("std");
-const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
@@ -8,32 +7,10 @@ const Clock = @import("../resource/Clock.zig");
 
 const event = component.event;
 const MapId = component.map.Id;
-const Position = component.Position;
-const Point = component.light.Point;
-const Spot = component.light.Spot;
 const Disabled = component.light.Disabled;
 const Night = component.light.Night;
 const Day = component.light.Day;
 const Pending = component.light.Pending;
-
-const Keyframe = struct { hour: f32, color: zhu.Color };
-
-// 屏幕覆盖色关键帧：只做可见昼夜色调，不模拟真实光照。
-const keyframes = [_]Keyframe{
-    .{ .hour = 4, .color = .rgba(10, 15, 41, 107) },
-    .{ .hour = 6, .color = .rgba(173, 76, 26, 46) },
-    .{ .hour = 9, .color = .rgba(0, 0, 0, 0) },
-    .{ .hour = 14, .color = .rgba(0, 0, 0, 0) },
-    .{ .hour = 18, .color = .rgba(204, 82, 20, 56) },
-    .{ .hour = 22, .color = .rgba(8, 13, 46, 122) },
-    .{ .hour = 28, .color = .rgba(10, 15, 41, 107) },
-};
-
-var glowImage: zhu.Image = undefined;
-
-pub fn init() void {
-    glowImage = zhu.getImage("light.png").?;
-}
 
 pub fn update(world: *ecs.World) void {
     const clock = world.getResourcePtr(Clock).?;
@@ -70,64 +47,6 @@ fn updatePending(world: *ecs.World, dark: bool) void {
     world.clear(Pending);
 }
 
-pub fn draw(world: *ecs.World) void {
-    const clock = world.getResourcePtr(Clock).?;
-
-    drawOverlay(clock.hour, clock.minute);
-    drawLights(world);
-}
-
-fn drawOverlay(hourValue: u8, minute: f32) void {
-    if (!isOutdoor(map.current)) return;
-
-    const hour = @as(f32, @floatFromInt(hourValue)) + minute / 60;
-    const overlay = overlayAt(hour);
-    if (overlay.a == 0) return;
-
-    zhu.batch.drawRect(zhu.camera.mainWorldRect(), .{ .color = overlay });
-}
-
-fn drawLights(world: *ecs.World) void {
-    const allPoint = .{ Position, Point };
-    var points = world.queryNot(allPoint, .{Disabled});
-    while (points.next()) |row| {
-        const position = row.get(Position);
-        const point = row.get(Point);
-        const center = position.add(point.offset);
-        const alpha = std.math.clamp(point.intensity, 0, 1);
-        const color = point.color.scaleAlpha(0.68 * alpha);
-        drawGlow(center, point.radius * 2.0, color);
-    }
-
-    const allSpot = .{ Position, Spot };
-    // 第一版不做真实锥形，先退化成圆形占位光圈验证地图数据。
-    var spots = world.queryNot(allSpot, .{Disabled});
-    while (spots.next()) |row| {
-        const pos = row.get(Position);
-        const spot = row.get(Spot);
-        const alpha = std.math.clamp(spot.intensity, 0, 1);
-        const color = spot.color.scaleAlpha(0.56 * alpha);
-        drawGlow(pos, spot.radius * 1.6, color);
-    }
-}
-
-fn overlayAt(hour: f32) zhu.Color {
-    const sampleHour = if (hour < 4) hour + 24 else hour;
-
-    var i: usize = 0;
-    while (i + 1 < keyframes.len) : (i += 1) {
-        const left = keyframes[i];
-        const right = keyframes[i + 1];
-        if (sampleHour >= left.hour and sampleHour < right.hour) {
-            const t = smoothStep((sampleHour - left.hour) /
-                (right.hour - left.hour));
-            return left.color.mix(right.color, t);
-        }
-    }
-
-    return keyframes[keyframes.len - 1].color;
-}
-
 fn isOutdoor(id: MapId) bool {
     // 光照系统只关心昼夜是否影响当前地图。
     return switch (id) {
@@ -136,39 +55,11 @@ fn isOutdoor(id: MapId) bool {
     };
 }
 
-fn drawGlow(center: zhu.Vector2, size: f32, color: zhu.Color) void {
-    const position = center.add(.xy(-size * 0.5, -size * 0.5));
-    zhu.batch.drawImage(glowImage, position, .{
-        .size = .all(size),
-        .color = color,
-    });
-}
-
-fn smoothStep(value: f32) f32 {
-    const t = std.math.clamp(value, 0, 1);
-    return t * t * (3 - 2 * t);
-}
-
-test "light overlay 正午不改变画面" {
-    const color = overlayAt(12);
-    try std.testing.expectEqual(0, color.a);
-}
-
-test "light overlay 深夜比白天更明显" {
-    const night = overlayAt(23);
-    const noon = overlayAt(12);
-
-    try std.testing.expect(night.a > noon.a);
-    try std.testing.expect(night.b > night.r);
-}
-
 test "light update 夜晚启用夜灯禁用日灯" {
     map.current = .exterior; // 设置为室外地图
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
-    world.addResource(Clock{});
-    const clock = world.getResourcePtr(Clock).?;
-    clock.hour = 18;
+    world.addResource(Clock{ .hour = 18 });
 
     const night = world.createEntity();
     world.add(night, Night{});

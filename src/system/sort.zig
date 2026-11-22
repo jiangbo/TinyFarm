@@ -1,45 +1,20 @@
 const std = @import("std");
-const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
 const Position = component.Position;
 const Render = component.render.Render;
-const Sprite = component.render.Sprite;
 const YSort = component.render.YSort;
-const Hidden = component.render.Hidden;
 
 pub fn update(world: *ecs.World) void {
     var query = world.query(.{ Render, Position, YSort });
     while (query.next()) |row| {
-        const position = row.get(Position);
-        row.getPtr(Render).depth = position.y;
+        row.getPtr(Render).depth = row.get(Position).y;
     }
-}
-
-pub fn draw(world: *ecs.World) void {
     world.sort(Render, {}, lessThan);
-
-    const viewport = zhu.camera.mainWorldRect();
-    var query = world.queryBy(Render, .{ Position, Sprite }, .{Hidden});
-    while (query.next()) |row| {
-        const render = row.get(Render);
-        const position = row.get(Position);
-        const sprite = row.get(Sprite);
-
-        const spriteSize = sprite.size orelse sprite.image.size;
-        const spritePosition = position.add(sprite.offset);
-        const spriteRect = zhu.Rect.init(spritePosition, spriteSize);
-        if (!viewport.intersect(spriteRect)) continue;
-        zhu.batch.drawImage(sprite.image, position.add(sprite.offset), .{
-            .size = sprite.size,
-            .color = render.color,
-            .uvRect = sprite.image.uvFlip(sprite.flip, false),
-        });
-    }
 }
 
-pub fn lessThan(_: void, lhs: Render, rhs: Render) bool {
+fn lessThan(_: void, lhs: Render, rhs: Render) bool {
     if (lhs.layer == rhs.layer) return lhs.depth < rhs.depth;
     return @backingInt(lhs.layer) < @backingInt(rhs.layer);
 }
@@ -66,6 +41,6 @@ test "YSort 会把位置 y 写入渲染深度" {
 
     update(&world);
 
-    const renders = world.get(entity, Render).?;
-    try std.testing.expectEqual(42, renders.depth);
+    const render = world.get(entity, Render).?;
+    try std.testing.expectEqual(42, render.depth);
 }

@@ -11,18 +11,12 @@ pub const life = @import("life.zig");
 pub const light = @import("light.zig");
 pub const movement = @import("movement.zig");
 pub const pickup = @import("pickup.zig");
-pub const render = @import("render.zig");
 pub const rest = @import("rest.zig");
+pub const sort = @import("sort.zig");
 pub const sound = @import("sound.zig");
 pub const time = @import("time.zig");
 pub const transition = @import("transition.zig");
 pub const wander = @import("wander.zig");
-
-pub fn init() void {
-    // 有独立资源或初始状态的系统在进入首个场景前完成初始化。
-    dialog.init();
-    light.init();
-}
 
 pub fn update(world: *ecs.World, delta: f32) void {
     // 时间先推进，地图跨天逻辑和灯光都依赖本帧最新时间事件。
@@ -45,7 +39,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
     rest.update(world);
     animation.update(world, delta);
     farm.update(world);
-    render.update(world);
+    sort.update(world);
 
     // 本帧世界结算完后记录下一帧是否需要切图。
     transition.update(world);

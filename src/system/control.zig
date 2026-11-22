@@ -33,16 +33,6 @@ pub fn update(world: *World) void {
     updateMovement(world, player);
 }
 
-pub fn draw(world: *World) void {
-    const player = world.getIdentity(Player).?;
-    const target = world.get(player, Target).?;
-    if (!target.active) return;
-
-    const tileSize = map.grid.cellSize();
-    const rect = zhu.Rect.init(target.position, tileSize);
-    zhu.batch.drawRect(rect, .{ .color = target.color });
-}
-
 fn updateMovement(world: *World, player: Entity) void {
     if (world.has(player, Busy)) return;
 
