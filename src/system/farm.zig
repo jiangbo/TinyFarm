@@ -385,7 +385,7 @@ test "斧头命中木材产出对象会减少生命" {
 
     try std.testing.expectEqual(entity, map.getTile(target).?.get(.product).?);
     try std.testing.expectEqual(1, world.get(entity, Health).?.value);
-    try std.testing.expectEqual(0, world.values(Pickup).len);
+    try std.testing.expectEqual(0, world.getComponents(Pickup).len);
 
     const sounds = world.getEvent(event.SoundPlay);
     try std.testing.expectEqual(1, sounds.len);
@@ -446,7 +446,7 @@ test "错误工具不会命中产出对象" {
 
     try std.testing.expectEqual(entity, map.getTile(target).?.get(.product).?);
     try std.testing.expectEqual(2, world.get(entity, Health).?.value);
-    try std.testing.expectEqual(0, world.values(Pickup).len);
+    try std.testing.expectEqual(0, world.getComponents(Pickup).len);
     try std.testing.expectEqual(0, world.getEvent(event.SoundPlay).len);
 }
 
@@ -473,7 +473,7 @@ test "镐子击碎石头会生成掉落" {
     try std.testing.expectEqual(null, map.getTile(target).?.get(.product));
     try std.testing.expect(!world.has(entity, Product));
 
-    const pickups = world.values(Pickup);
+    const pickups = world.getComponents(Pickup);
     try std.testing.expectEqual(1, pickups.len);
     try std.testing.expectEqual(ItemEnum.stone, pickups[0].item);
     try std.testing.expect(pickups[0].count >= 1);
@@ -505,7 +505,7 @@ test "sickle 会收获成熟作物并生成掉落物" {
     try std.testing.expectEqual(null, map.getTile(target).?.get(.crop));
     try std.testing.expectEqual(null, world.get(crop, Crop));
 
-    const pickups = world.values(Pickup);
+    const pickups = world.getComponents(Pickup);
     try std.testing.expectEqual(1, pickups.len);
     try std.testing.expectEqual(ItemEnum.potato, pickups[0].item);
 
@@ -533,6 +533,6 @@ test "hoe 不会收获成熟作物" {
     update(&world);
 
     try std.testing.expectEqual(crop, map.getTile(target).?.get(.crop).?);
-    try std.testing.expectEqual(0, world.values(Pickup).len);
+    try std.testing.expectEqual(0, world.getComponents(Pickup).len);
     try std.testing.expectEqual(0, world.getEvent(event.SoundPlay).len);
 }

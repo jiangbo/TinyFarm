@@ -448,11 +448,11 @@ test "spawnPlayer 会创建玩家实体" {
 
     const player = world.getIdentity(actor.Player).?;
     try expectEqual(160, world.get(player, component.Position).?.x);
-    try expectEqual(1, world.values(motion.Velocity).len);
-    try expectEqual(1, world.values(actor.Actor).len);
-    try expectEqual(1, world.values(render.Sprite).len);
-    try expectEqual(1, world.values(render.Render).len);
-    try expectEqual(1, world.values(render.YSort).len);
+    try expectEqual(1, world.getComponents(motion.Velocity).len);
+    try expectEqual(1, world.getComponents(actor.Actor).len);
+    try expectEqual(1, world.getComponents(render.Sprite).len);
+    try expectEqual(1, world.getComponents(render.Render).len);
+    try expectEqual(1, world.getComponents(render.YSort).len);
 }
 
 test "spawnPlayer 重复调用只保留一个玩家" {
@@ -464,9 +464,9 @@ test "spawnPlayer 重复调用只保留一个玩家" {
 
     const player = world.getIdentity(actor.Player).?;
     try expectEqual(200, world.get(player, component.Position).?.x);
-    try expectEqual(1, world.values(component.Position).len);
-    try expectEqual(1, world.values(motion.Velocity).len);
-    try expectEqual(1, world.values(actor.Actor).len);
+    try expectEqual(1, world.getComponents(component.Position).len);
+    try expectEqual(1, world.getComponents(motion.Velocity).len);
+    try expectEqual(1, world.getComponents(actor.Actor).len);
 }
 
 test "spawnAnimal 会创建可漫游动物实体" {

@@ -115,7 +115,7 @@ test "interact 按下交互键会给最近目标挂交互标记" {
 
     try std.testing.expectEqual(near, world.getIdentity(Interact).?);
     try std.testing.expect(world.getIdentity(Interact) != far);
-    try std.testing.expectEqual(0, world.values(Hit).len);
+    try std.testing.expectEqual(0, world.getComponents(Hit).len);
 }
 
 test "interact 对话中不会重新寻找目标" {
