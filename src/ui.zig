@@ -11,6 +11,7 @@ const pause = @import("ui/pause.zig");
 const save = @import("ui/save.zig");
 
 const Config = @import("storage.zig").Config;
+const titleMenus: []const zhu.widget.Menu = @import("zon/title.zon");
 
 pub const Message = struct { text: []const u8, fail: bool };
 pub const Request = union(enum) {
@@ -21,6 +22,7 @@ pub const Request = union(enum) {
 };
 const Popup = enum { save, rest, pause };
 
+var pauseButton: zhu.widget.Menu = titleMenus[1];
 var activePopup: ?Popup = null;
 var popupMessage: ?Message = null;
 
@@ -36,6 +38,8 @@ pub fn init(args: Init) void {
     pause.cfg = args.config;
     save.init(args.slots);
     rest.init();
+    const size = pauseButton.buttons[0].shape.toRect().size;
+    pauseButton.position = .xy(zhu.camera.size.x - 10 - size.x, 10);
 }
 
 pub fn deinit() void {}
@@ -62,7 +66,13 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
         return .block;
     }
 
-    if (input.released(.pause)) {
+    const mouse = zhu.mouse.pos.sub(pauseButton.position);
+    const button = pauseButton.buttons[0].shape.toRect();
+    if (button.contains(mouse) or pauseButton.pressed != null) {
+        input.mouseCaptured = true;
+    }
+
+    if (input.released(.pause) or pauseButton.update(.{ .nav = .none }) != null) {
         openPause();
         return .block;
     }
@@ -118,6 +128,7 @@ pub fn close() void {
 
 pub fn draw(world: *ecs.World) void {
     time.draw(world);
+    pauseButton.draw();
     inventory.draw(world);
 
     if (activePopup) |active| {
