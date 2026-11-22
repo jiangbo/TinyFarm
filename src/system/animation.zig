@@ -16,10 +16,9 @@ pub fn update(world: *ecs.World, delta: f32) void {
     var query = world.query(.{ Animation, Sprite });
     while (query.next()) |row| {
         const animation = row.getPtr(Animation);
-        if (animation.isFinished()) continue;
+        if (!animation.advance(delta)) continue;
         const sprite = row.getPtr(Sprite);
 
-        animation.advance(delta);
         while (animation.nextStep()) |step| switch (step) {
             .start, .next, .loop => {
                 if (animation.frame().extend == 0) continue;
