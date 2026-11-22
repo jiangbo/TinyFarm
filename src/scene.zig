@@ -3,9 +3,9 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("component.zig");
+const factory = @import("factory.zig");
 const input = @import("input.zig");
 const map = @import("map.zig");
-const player = @import("player.zig");
 const render = @import("render.zig");
 const storage = @import("storage.zig");
 const system = @import("system/system.zig");
@@ -21,7 +21,9 @@ const resource = struct {
 
 const World = ecs.World;
 const actor = component.actor;
+const Position = component.Position;
 const Transition = component.map.Transition;
+const Trigger = component.map.Trigger;
 
 const MapFade = struct {
     const Phase = enum { out, in };
@@ -152,7 +154,7 @@ fn updateMapFade(delta: f32) bool {
             map.exit(allocator, &world);
             resetWorld();
             map.enter(allocator, &world, request.target);
-            player.spawn(&world, request.targetId);
+            spawnPlayer(request.targetId);
             system.light.update(&world);
             system.sort.update(&world);
             mapFade.phase = .in;
@@ -207,7 +209,7 @@ fn enterPlay(loadSlot: ?u8) void {
 
     resetWorld();
     map.enter(allocator, &world, .home_exterior);
-    player.spawn(&world, -1);
+    spawnPlayer(-1);
     system.light.update(&world);
     system.sort.update(&world);
     const inv = world.getResourcePtr(resource.Inventory).?;
@@ -250,7 +252,7 @@ fn capture() storage.Record {
     return .{
         .timestamp = zhu.timestamp().toSeconds(),
         .clock = clock.*,
-        .player = player.capture(&world, map.current),
+        .player = capturePlayer(),
         .inventory = inv.capture(),
         .maps = map.capture(allocator, &world),
     };
@@ -267,12 +269,53 @@ fn restore(record: storage.Record) void {
 
     resetWorld();
     map.enter(allocator, &world, record.player.map);
-    player.spawn(&world, -1);
-    player.restore(&world, record.player);
+    const entity = factory.spawnPlayer(&world, record.player.position);
+    world.getPtr(entity, actor.Actor).?.facing = record.player.facing;
+    zhu.camera.directFollow(record.player.position);
     system.light.update(&world);
     system.sort.update(&world);
     ui.resetInventory();
     world.getResourcePtr(resource.Inventory).?.restore(record.inventory);
+}
+
+fn spawnPlayer(targetId: i32) void {
+    const position = spawnPosition(targetId);
+    _ = factory.spawnPlayer(&world, position);
+    zhu.camera.directFollow(position);
+}
+
+fn spawnPosition(targetId: i32) zhu.Vector2 {
+    var query = world.query(.{Trigger});
+    while (query.next()) |row| {
+        const trigger = row.get(Trigger);
+        if (trigger.selfId == targetId) return triggerPosition(trigger);
+    }
+
+    return .xy(311, 168);
+}
+
+fn triggerPosition(trigger: Trigger) zhu.Vector2 {
+    const offset = 8;
+    const center = trigger.rect.center();
+    return switch (trigger.startOffset) {
+        .left => .xy(trigger.rect.min.x - offset, center.y),
+        .right => .xy(trigger.rect.max().x + offset, center.y),
+        .top => .xy(center.x, trigger.rect.min.y - offset),
+        .bottom => .xy(center.x, trigger.rect.max().y + offset),
+        .none => center,
+    };
+}
+
+fn capturePlayer() storage.Player {
+    const entity = world.getIdentity(actor.Player).?;
+    const position = world.get(entity, Position).?;
+    const state = world.get(entity, actor.Actor) orelse actor.Actor{};
+
+    return .{
+        .map = map.current,
+        .position = position,
+        .facing = state.facing,
+    };
 }
 
 fn resetWorld() void {
