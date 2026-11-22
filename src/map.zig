@@ -61,6 +61,26 @@ pub fn enter(gpa: zhu.Allocator, world: *World, id: Id) void {
     current = id;
     load(gpa, world, maps[@backingInt(id)]);
     restoreCurrent(gpa, world);
+
+    // 原始地图没有住宅室外与城镇的连接，由游戏补充。
+    const trigger: component.map.Trigger = switch (id) {
+        .home_exterior => .{
+            .rect = .init(.xy(552, 227), .xy(7, 25)),
+            .selfId = 2,
+            .targetId = 2,
+            .targetMap = .town,
+            .startOffset = .left,
+        },
+        .town => .{
+            .rect = .init(.xy(1, 227), .xy(7, 25)),
+            .selfId = 2,
+            .targetId = 2,
+            .targetMap = .home_exterior,
+            .startOffset = .right,
+        },
+        else => return,
+    };
+    _ = factory.spawnMapTrigger(world, trigger);
 }
 
 pub fn update(world: *World) void {
