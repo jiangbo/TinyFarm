@@ -34,8 +34,8 @@ pub fn update(world: *ecs.World, delta: f32) void {
                 const actor = world.getPtr(row.entity, Actor).?;
                 actor.action = .idle;
 
-                const frameRow = actorRow(actor, sprite);
-                animation.play(actor.sources.get(actor.action), frameRow);
+                sprite.flip = actor.flip();
+                animation.play(actor.sources.get(actor.action), actor.frameRow());
                 break;
             },
         };
@@ -50,19 +50,13 @@ fn updateActor(world: *ecs.World) void {
         const animation = row.getPtr(Animation);
         const sprite = row.getPtr(Sprite);
 
-        const frameRow = actorRow(actor, sprite);
+        sprite.flip = actor.flip();
+        const frameRow = actor.frameRow();
         const sameAction = animation.getEnumExtend(Action) == actor.action;
         if (sameAction and animation.row == frameRow) continue;
 
         animation.play(actor.sources.get(actor.action), frameRow);
     }
-}
-
-fn actorRow(actor: *const Actor, sprite: *Sprite) u8 {
-    const raw = actor.rows[@backingInt(actor.facing)];
-    sprite.flip = raw < 0;
-    std.debug.assert(raw != 0);
-    return @intCast(@abs(raw) - 1);
 }
 
 test "动画系统会按角色方向行更新精灵" {

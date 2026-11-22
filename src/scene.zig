@@ -269,8 +269,7 @@ fn restore(record: storage.Record) void {
 
     resetWorld();
     map.enter(allocator, &world, record.player.map);
-    const entity = factory.spawnPlayer(&world, record.player.position);
-    world.getPtr(entity, actor.Actor).?.facing = record.player.facing;
+    factory.spawnPlayer(&world, record.player.position, record.player.facing);
     zhu.camera.directFollow(record.player.position);
     system.light.update(&world);
     system.sort.update(&world);
@@ -288,7 +287,7 @@ fn spawnPlayer(targetId: i32) void {
             break;
         }
     }
-    _ = factory.spawnPlayer(&world, position);
+    factory.spawnPlayer(&world, position, .down);
     zhu.camera.directFollow(position);
 }
 

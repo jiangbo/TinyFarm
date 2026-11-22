@@ -98,7 +98,7 @@ pub fn resolveImage(sprite: Sprite) zhu.graphics.Image {
     return zhu.assets.getImage(sprite.imageId).?.sub(sprite.rect);
 }
 
-pub fn spawnPlayer(world: *World, spawn: zhu.Vector2) Entity {
+pub fn spawnPlayer(world: *World, spawn: zhu.Vector2, facing: actor.Facing) void {
     if (world.getIdentity(actor.Player)) |oldPlayer| {
         world.destroyEntity(oldPlayer);
         world.removeIdentity(actor.Player);
@@ -114,24 +114,26 @@ pub fn spawnPlayer(world: *World, spawn: zhu.Vector2) Entity {
     });
     world.add(player, motion.Blocking{});
     const character: actor.Actor = .{
+        .facing = facing,
         .rows = config.rows,
         .sources = .generate(config.sources),
     };
     world.add(player, character);
     const source = character.sources.get(.idle);
-    const animation = zhu.Animation.initSource(source);
+    var animation = zhu.Animation.initSource(source);
+    animation.row = character.frameRow();
 
     world.add(player, render.Sprite{
         .image = animation.subImage(),
         .offset = config.sprite.offset,
         .size = config.sprite.size,
+        .flip = character.flip(),
     });
 
     world.add(player, animation);
     world.add(player, render.Render{ .layer = .actor });
     world.add(player, render.YSort{});
     world.add(player, ui.Target{});
-    return player;
 }
 
 pub fn spawnAnimal(world: *World, kind: actor.Animal) Entity {
@@ -456,8 +458,9 @@ test "spawnPlayer 会创建玩家实体" {
     var world = World.init(std.testing.allocator);
     defer world.deinit();
 
-    const player = spawnPlayer(&world, .xy(160, 96));
+    spawnPlayer(&world, .xy(160, 96), .down);
 
+    const player = world.getIdentity(actor.Player).?;
     try expectEqual(160, world.get(player, component.Position).?.x);
     try expectEqual(1, world.getComponents(motion.Velocity).len);
     try expectEqual(1, world.getComponents(actor.Actor).len);
@@ -470,9 +473,10 @@ test "spawnPlayer 重复调用只保留一个玩家" {
     var world = World.init(std.testing.allocator);
     defer world.deinit();
 
-    _ = spawnPlayer(&world, .xy(160, 96));
-    const player = spawnPlayer(&world, .xy(200, 128));
+    spawnPlayer(&world, .xy(160, 96), .down);
+    spawnPlayer(&world, .xy(200, 128), .down);
 
+    const player = world.getIdentity(actor.Player).?;
     try expectEqual(200, world.get(player, component.Position).?.x);
     try expectEqual(1, world.getComponents(component.Position).len);
     try expectEqual(1, world.getComponents(motion.Velocity).len);

@@ -83,6 +83,16 @@ pub const actor = struct {
         facing: Facing = .down,
         rows: [4]i8 = .{ 1, 2, -3, 3 },
         sources: zhu.graphics.Sources(Action) = .init(&.{}),
+
+        pub fn flip(self: Actor) bool {
+            return self.rows[@backingInt(self.facing)] < 0;
+        }
+
+        pub fn frameRow(self: Actor) u8 {
+            const raw = self.rows[@backingInt(self.facing)];
+            std.debug.assert(raw != 0);
+            return @intCast(@abs(raw) - 1);
+        }
     };
     pub const Busy = struct {};
 
