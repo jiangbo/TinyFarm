@@ -26,11 +26,11 @@ pub const Id = component.map.Id;
 pub const StartOffset = component.map.StartOffset;
 pub const Hit = component.map.Hit;
 
-pub const maps = tiled.bind(@import("zon/map/tileSet.zon"), &.{
-    @import("zon/map/school.zon"),
-    @import("zon/map/town.zon"),
-    @import("zon/map/exterior.zon"),
-    @import("zon/map/interior.zon"),
+pub const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
+    @import("zon/maps/school.zon"),
+    @import("zon/maps/town.zon"),
+    @import("zon/maps/home_exterior.zon"),
+    @import("zon/maps/home_interior.zon"),
 });
 
 pub var current: Id = .school;

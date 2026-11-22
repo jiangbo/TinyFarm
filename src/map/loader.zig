@@ -16,7 +16,7 @@ const item = component.item;
 const motion = component.motion;
 const Trigger = component.map.Trigger;
 const SolidRange = component.map.SolidRange;
-const mock: []const tiled.Map = @import("../zon/map/mock.zon");
+const mock: []const tiled.Map = @import("../zon/maps/mock.zon");
 
 pub const Loaded = struct {
     land: Land = .{},

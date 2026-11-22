@@ -29,13 +29,14 @@
 - [FFmpeg](https://ffmpeg.org/)：音频转换，需要 `ffmpeg` 和 `ffprobe`。
 - [oxipng](https://github.com/oxipng/oxipng)：可选，检测到时自动无损优化 PNG 和 ICO。
 
-按顺序执行以下命令，先生成字体，再生成引用字体图片的图集，然后转换音频并更新独立素材：
+先生成字体，再生成引用字体图片的图集。音频转换、独立素材复制和地图转换可分别执行：
 
 ```sh
 zig build fontbm
 zig build atlas
 zig build audio
 zig build copy
+zig build tiled
 ```
 
 | 命令 | 当前配置及输出 |
@@ -44,8 +45,9 @@ zig build copy
 | `atlas` | 筛选图片并预乘 Alpha，生成固定 1024×1024 的图集到 `assets/atlas/`，更新 `src/zon/atlas.zon`，同时引用字体页面 |
 | `audio` | 输出到 `assets/audio/`，采样率 11025Hz，Vorbis 质量 0 |
 | `copy` | 更新首页背景、鼠标光标和窗口图标到 `assets/` |
+| `tiled` | 读取 `raw-assets/maps/` 下的 `.tmj` 和 `.tsj`，生成 `src/zon/maps/` 下的地图和 `src/zon/tileSet.zon` |
 
-这三个生成命令会清空各自的输出目录后重建。修改源码中的文字后，依次运行
+`fontbm`、`atlas` 和 `audio` 会清空各自的输出目录后重建。修改源码中的文字后，依次运行
 `fontbm`、`atlas`；修改图集素材后运行 `atlas`；修改音频后运行 `audio`。
 修改首页背景、鼠标光标或窗口图标后运行 `zig build copy`。
 
