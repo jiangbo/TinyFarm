@@ -3301,6 +3301,10 @@
         .tiles = .{
             .{
                 .id = 2150676121,
+                .imageRect = .{
+                    .min = .{ .x = 0, .y = 0 },
+                    .size = .{ .x = 128, .y = 100 },
+                },
                 .objectGroup = .{ .visible = true, .objects = .{.{
                     .id = 1,
                     .gid = 0,
