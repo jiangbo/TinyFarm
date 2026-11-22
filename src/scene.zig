@@ -153,6 +153,7 @@ fn updateMapFade(delta: f32) bool {
             resetWorld();
             map.enter(allocator, &world, request.target);
             player.spawn(&world, request.targetId);
+            system.light.update(&world);
             system.sort.update(&world);
             mapFade.phase = .in;
             mapFade.timer.restart();
@@ -207,6 +208,7 @@ fn enterPlay(loadSlot: ?u8) void {
     resetWorld();
     map.enter(allocator, &world, .home_exterior);
     player.spawn(&world, -1);
+    system.light.update(&world);
     system.sort.update(&world);
     const inv = world.getResourcePtr(resource.Inventory).?;
     inv.reset();
@@ -267,6 +269,7 @@ fn restore(record: storage.Record) void {
     map.enter(allocator, &world, record.player.map);
     player.spawn(&world, -1);
     player.restore(&world, record.player);
+    system.light.update(&world);
     system.sort.update(&world);
     ui.resetInventory();
     world.getResourcePtr(resource.Inventory).?.restore(record.inventory);

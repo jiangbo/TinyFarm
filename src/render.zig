@@ -17,29 +17,35 @@ const Player = component.actor.Player;
 const Dialog = component.actor.Dialog;
 const Point = component.light.Point;
 const Spot = component.light.Spot;
+const Emissive = component.light.Emissive;
 const Disabled = component.light.Disabled;
 
 const Keyframe = struct { hour: f32, color: zhu.Color };
 
-// 屏幕覆盖色关键帧：只做可见昼夜色调，不模拟真实光照。
+// 环境光关键帧（乘法光照图底色，正午为纯白原色）。
 const keyframes = [_]Keyframe{
-    .{ .hour = 4, .color = .rgba(10, 15, 41, 107) },
-    .{ .hour = 6, .color = .rgba(173, 76, 26, 46) },
-    .{ .hour = 9, .color = .rgba(0, 0, 0, 0) },
-    .{ .hour = 14, .color = .rgba(0, 0, 0, 0) },
-    .{ .hour = 18, .color = .rgba(204, 82, 20, 56) },
-    .{ .hour = 22, .color = .rgba(8, 13, 46, 122) },
-    .{ .hour = 28, .color = .rgba(10, 15, 41, 107) },
+    .{ .hour = 4, .color = .rgb(38, 42, 72) },
+    .{ .hour = 6, .color = .rgb(190, 145, 115) },
+    .{ .hour = 9, .color = .rgb(245, 240, 230) },
+    .{ .hour = 14, .color = .rgb(255, 255, 255) },
+    .{ .hour = 18, .color = .rgb(220, 140, 95) },
+    .{ .hour = 22, .color = .rgb(38, 42, 72) },
+    .{ .hour = 28, .color = .rgb(38, 42, 72) },
 };
 
 const clearColor: zhu.Color = .rgb(59, 79, 69);
 
 var canvas: zhu.graphics.RenderTarget = .{};
+var lightCanvas: zhu.graphics.RenderTarget = .{};
 var bubbleImage: zhu.NineImage = undefined;
 var glowImage: zhu.Image = undefined;
+var spotImage: zhu.Image = undefined;
 
 pub fn init() void {
     canvas = zhu.graphics.createRenderTarget(zhu.camera.size, .nearest);
+    lightCanvas = zhu.graphics.createRenderTarget(zhu.camera.size, .nearest);
+    const mul = zhu.graphics.createQuadPipeline(.multiply);
+    zhu.assets.gpu.putView(lightCanvas.image.view, mul);
 
     const dialogImage = zhu.getImage("farm-rpg/UI/dialogue box.png").?;
     bubbleImage = zhu.NineImage.from(dialogImage, .{
@@ -47,20 +53,29 @@ pub fn init() void {
         .patch = .{ .min = .xy(3, 4), .max = .xy(3, 3) },
     });
     glowImage = zhu.getImage("light.png").?;
+    spotImage = zhu.getImage("spot.png").?;
 }
 
 pub fn deinit() void {
     canvas.deinit();
+    lightCanvas.deinit();
 }
 
 pub fn draw(world: *const World) void {
-    zhu.batch.beginDraw(clearColor, .{ .target = &canvas });
+    const clock = world.getResourcePtr(Clock).?;
+    const ambient = ambientColor(map.current, clock);
+    zhu.batch.beginDraw(ambient, .{ .target = &lightCanvas });
+    drawLights(world);
+
+    zhu.batch.useTarget(clearColor, .{ .target = &canvas });
     map.drawBack();
     drawSprites(world);
     map.drawFront();
     drawTarget(world);
+    // 对比过不参与光照的效果，确认保留对话气泡参与光照合成。
     drawDialog(world);
-    drawLight(world);
+    zhu.batch.drawCamera(lightCanvas.image, .zero, .window, .{});
+    drawEmissive(world);
 
     zhu.batch.useTarget(clearColor, .{});
     zhu.camera.push(.window);
@@ -122,22 +137,6 @@ fn drawBubble(head: zhu.Vector2, text: []const u8) void {
     zhu.text.draw(text, bubbleRect.min.add(.xy(8, 8)), option);
 }
 
-fn drawLight(world: *const World) void {
-    const clock = world.getResourcePtr(Clock).?;
-    drawOverlay(clock.hour, clock.minute);
-    drawLights(world);
-}
-
-fn drawOverlay(hourValue: u8, minute: f32) void {
-    if (!isOutdoor(map.current)) return;
-
-    const hour = @as(f32, @floatFromInt(hourValue)) + minute / 60;
-    const overlay = overlayAt(hour);
-    if (overlay.a == 0) return;
-
-    zhu.batch.drawRect(zhu.camera.mainWorldRect(), .{ .color = overlay });
-}
-
 fn drawLights(world: *const World) void {
     var points = world.queryNot(.{ Position, Point }, .{Disabled});
     while (points.next()) |row| {
@@ -145,22 +144,58 @@ fn drawLights(world: *const World) void {
         const point = row.get(Point);
         const center = position.add(point.offset);
         const alpha = std.math.clamp(point.intensity, 0, 1);
-        const color = point.color.scaleAlpha(0.68 * alpha);
-        drawGlow(center, point.radius * 2.0, color);
+        drawGlow(center, point.radius * 2.0, point.color.scaleAlpha(alpha));
     }
 
-    // 第一版不做真实锥形，先退化成圆形占位光圈验证地图数据。
     var spots = world.queryNot(.{ Position, Spot }, .{Disabled});
     while (spots.next()) |row| {
         const pos = row.get(Position);
         const spot = row.get(Spot);
         const alpha = std.math.clamp(spot.intensity, 0, 1);
-        const color = spot.color.scaleAlpha(0.56 * alpha);
-        drawGlow(pos, spot.radius * 1.6, color);
+        zhu.batch.drawImage(spotImage, pos, .{
+            .size = .all(spot.radius * 2.0),
+            .anchor = .center,
+            .pivot = .center,
+            .radian = spot.direction.atan2(),
+            .color = .all(0),
+            .addColor = spot.color.scaleAlpha(alpha),
+        });
     }
 }
 
-fn overlayAt(hour: f32) zhu.Color {
+fn drawEmissive(world: *const World) void {
+    var query = world.queryNot(.{ Position, Emissive }, .{Disabled});
+    while (query.next()) |row| {
+        const pos = row.get(Position);
+        const em = row.get(Emissive);
+        const alpha = std.math.clamp(em.intensity, 0, 1);
+        zhu.batch.drawImage(zhu.batch.whiteImage, pos, .{
+            .size = em.size,
+            .color = .all(0),
+            .addColor = em.color.scaleAlpha(alpha),
+        });
+        const center = pos.add(.xy(em.size.x * 0.5, em.size.y * 0.5));
+        const glowSize = @max(em.size.x, em.size.y) + 22;
+        drawGlow(center, glowSize, em.color.scaleAlpha(alpha * 0.35));
+    }
+}
+
+fn ambientColor(id: MapId, clock: *const Clock) zhu.Color {
+    if (!isOutdoor(id)) {
+        const data = map.maps[@backingInt(id)];
+        const ambient = data.getClass("ambient") orelse return .white;
+        return .fromFloat(.{
+            .r = ambient.get("red", f32) orelse 1,
+            .g = ambient.get("green", f32) orelse 1,
+            .b = ambient.get("blue", f32) orelse 1,
+            .a = 1,
+        });
+    }
+    const hour = @as(f32, @floatFromInt(clock.hour)) + clock.minute / 60;
+    return ambientAt(hour);
+}
+
+fn ambientAt(hour: f32) zhu.Color {
     const sampleHour = if (hour < 4) hour + 24 else hour;
 
     var i: usize = 0;
@@ -188,7 +223,8 @@ fn drawGlow(center: zhu.Vector2, size: f32, color: zhu.Color) void {
     const position = center.add(.xy(-size * 0.5, -size * 0.5));
     zhu.batch.drawImage(glowImage, position, .{
         .size = .all(size),
-        .color = color,
+        .color = .all(0),
+        .addColor = color,
     });
 }
 
@@ -197,15 +233,22 @@ fn smoothStep(value: f32) f32 {
     return t * t * (3 - 2 * t);
 }
 
-test "light overlay 正午不改变画面" {
-    const color = overlayAt(12);
-    try std.testing.expectEqual(0, color.a);
+test "室内环境光优先使用地图配置，缺省为白色" {
+    const clock = Clock{ .hour = 23 };
+    const gray = zhu.Color.rgb(179, 179, 179);
+    try std.testing.expectEqual(gray, ambientColor(.home_interior, &clock));
+    try std.testing.expectEqual(zhu.Color.white, ambientColor(.school, &clock));
 }
 
-test "light overlay 深夜比白天更明显" {
-    const night = overlayAt(23);
-    const noon = overlayAt(12);
+test "ambient 正午为纯白原色" {
+    const color = ambientAt(14);
+    try std.testing.expectEqual(zhu.Color.white, color);
+}
 
-    try std.testing.expect(night.a > noon.a);
+test "ambient 深夜比正午暗且偏冷蓝" {
+    const night = ambientAt(23);
+    const noon = ambientAt(14);
+
+    try std.testing.expect(night.r < noon.r);
     try std.testing.expect(night.b > night.r);
 }
