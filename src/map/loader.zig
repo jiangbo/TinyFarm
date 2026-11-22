@@ -331,6 +331,11 @@ fn loadLight(ctx: *Context, object: tiled.Object) void {
 
     if (object.isNamed("spot")) {
         _ = factory.spawnSpotLight(ctx.world, object);
+        return;
+    }
+
+    if (object.isNamed("emissive")) {
+        _ = factory.spawnEmissiveLight(ctx.world, object);
     }
 }
 

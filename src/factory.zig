@@ -355,6 +355,17 @@ pub fn spawnSpotLight(world: *World, object: Object) Entity {
     return entity;
 }
 
+pub fn spawnEmissiveLight(world: *World, object: Object) Entity {
+    const entity = world.createEntity();
+    world.add(entity, light.Emissive{
+        .size = object.size,
+        .intensity = object.getProperty("intensity", f32) orelse 1.0,
+    });
+    world.add(entity, object.position);
+    applyLight(world, entity, object);
+    return entity;
+}
+
 fn spotDirection(spot: zhu.extend.tiled.ClassProperty) zhu.Vector2 {
     const degrees = spot.get("direction_deg", f32).?;
     const radians = std.math.degreesToRadians(degrees);

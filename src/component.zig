@@ -207,6 +207,12 @@ pub const light = struct {
         intensity: f32 = 1.0,
     };
 
+    pub const Emissive = struct {
+        size: zhu.Vector2,
+        color: zhu.Color = .rgba(255, 220, 140, 255),
+        intensity: f32 = 1.0,
+    };
+
     pub const Disabled = struct {};
     pub const Night = struct {};
     pub const Day = struct {};

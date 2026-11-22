@@ -85,6 +85,7 @@ pub fn build(b: *std.Build) !void {
         .include = &.{
             "circle.png",
             "light.png",
+            "spot.png",
             "textures/",
             "farm-rpg/",
         },
