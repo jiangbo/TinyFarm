@@ -140,7 +140,7 @@ fn updatePlay(delta: f32) void {
     }
 
     system.update(&world, delta);
-    map.update(&world);
+    map.update(&world, delta);
 }
 
 fn updateMapFade(delta: f32) bool {

@@ -83,7 +83,8 @@ pub fn enter(gpa: zhu.Allocator, world: *World, id: Id) void {
     _ = factory.spawnMapTrigger(world, trigger);
 }
 
-pub fn update(world: *World) void {
+pub fn update(world: *World, delta: f32) void {
+    loaded.updateAnimations(delta);
     for (world.getEvent(component.event.DayChanged)) |_| {
         for (loaded.land.tiles) |*tile| {
             const watered = tile.ground == .wet;
@@ -488,7 +489,7 @@ test "当前地图跨天推进作物后刷新贴图和渲染层" {
     tile.set(.crop, crop);
     world.addEvent(component.event.DayChanged{ .day = 2 });
 
-    update(&world);
+    update(&world, 0);
 
     const result = world.get(crop, farm.Crop).?;
     const stage = factory.cropStage(.strawberry, .sprout);
@@ -537,7 +538,7 @@ test "当前地图和离线地图跨天推进规则一致" {
         .day = 1,
         .tiles = &tiles,
     };
-    update(&world);
+    update(&world, 0);
     advanceState(&state, 2);
 
     const currentCrop = world.get(cropEntity, farm.Crop).?;
@@ -743,7 +744,7 @@ test "当前地图跨天会推进作物并清干湿地" {
     tile.set(.crop, crop);
     world.addEvent(component.event.DayChanged{ .day = 2 });
 
-    update(&world);
+    update(&world, 0);
 
     const result = world.get(crop, farm.Crop).?;
     try std.testing.expectEqual(@as(f32, 2), result.next);

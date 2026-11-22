@@ -18,11 +18,14 @@ const Trigger = component.map.Trigger;
 const SolidRange = component.map.SolidRange;
 const mock: []const tiled.Map = @import("../zon/maps/mock.zon");
 
+const AnimatedTile = struct { vertex: usize, animation: zhu.Animation };
+
 pub const Loaded = struct {
     land: Land = .{},
     mask: SolidMask = undefined,
     areas: std.ArrayList(zhu.Rect) = .empty,
     vertexes: std.ArrayList(zhu.Vertex) = .empty,
+    animatedTiles: std.ArrayList(AnimatedTile) = .empty,
     frontStart: usize = 0,
     loaded: bool = false,
 
@@ -44,8 +47,17 @@ pub const Loaded = struct {
         self.mask.deinit(gpa);
         self.areas.clearAndFree(gpa);
         self.vertexes.clearAndFree(gpa);
+        self.animatedTiles.clearAndFree(gpa);
         self.frontStart = 0;
         self.loaded = false;
+    }
+
+    pub fn updateAnimations(self: *Loaded, delta: f32) void {
+        for (self.animatedTiles.items) |*tile| {
+            if (!tile.animation.update(delta)) continue;
+            const image = tile.animation.subImage();
+            self.vertexes.items[tile.vertex].uvRect = image.uvRect();
+        }
     }
 
     pub fn addSolidRect(self: *Loaded, gpa: zhu.Allocator, rect: zhu.Rect) void {
@@ -123,7 +135,14 @@ fn parseTileLayer(ctx: *Context, layer: *const tiled.Layer) void {
             continue;
         }
         if (ctx.map.getImage(globalId)) |image| {
-            appendVertex(ctx, ctx.map.grid.indexToWorld(index), image);
+            const position = ctx.map.grid.indexToWorld(index);
+            if (ctx.map.getAnimation(globalId)) |animation| {
+                ctx.loaded.animatedTiles.append(ctx.gpa, .{
+                    .vertex = ctx.loaded.vertexes.items.len,
+                    .animation = animation,
+                }) catch zhu.oom();
+                appendVertex(ctx, position, animation.subImage());
+            } else appendVertex(ctx, position, image);
         }
 
         const tile = ctx.map.getTile(globalId) orelse continue;
