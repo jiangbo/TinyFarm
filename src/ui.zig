@@ -72,7 +72,7 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
         input.mouseCaptured = true;
     }
 
-    if (input.released(.pause) or pauseButton.update(.{ .nav = .none }) != null) {
+    if (input.released(.pause) or pauseButton.update(.{}) != null) {
         openPause();
         return .block;
     }

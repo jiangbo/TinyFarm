@@ -131,6 +131,12 @@
     },
     // 标题页右上角暂停按钮
     .{
+        .navKeys = .{
+            .up = .{},
+            .down = .{},
+            .confirm = .{},
+            .cancel = .{},
+        },
         .buttons = .{
             .{
                 .event = 0,
