@@ -368,7 +368,6 @@ fn advanceCropOneDay(crop: *farm.Crop, watered: bool) bool {
     if (crop.stage == .mature) return false;
 
     crop.next -= if (watered) 2 else 1;
-    crop.timer = 0;
     if (crop.next > 0) return false;
 
     crop.stage = zhu.enums.next(crop.stage);
@@ -407,7 +406,6 @@ test "地图状态作物会按离线天数推进" {
         .object = .{ .crop = .{
             .kind = .strawberry,
             .stage = .seed,
-            .timer = 0,
             .next = 2,
         } },
     }};
@@ -422,7 +420,6 @@ test "地图状态作物会按离线天数推进" {
         else => unreachable,
     };
     try std.testing.expectEqual(farm.GrowthEnum.sprout, crop.stage);
-    try std.testing.expectEqual(0, crop.timer);
     try std.testing.expectEqual(
         factory.cropStage(.strawberry, .sprout).duration,
         crop.next,
@@ -440,7 +437,6 @@ test "湿地离线跨天只加速一天" {
         .object = .{ .crop = .{
             .kind = .strawberry,
             .stage = .seed,
-            .timer = 0,
             .next = 4,
         } },
     }};
@@ -542,7 +538,6 @@ test "当前地图和离线地图跨天推进规则一致" {
     };
     try std.testing.expectEqual(offlineCrop.stage, currentCrop.stage);
     try std.testing.expectEqual(offlineCrop.next, currentCrop.next);
-    try std.testing.expectEqual(offlineCrop.timer, currentCrop.timer);
     try std.testing.expectEqual(state.tiles[0].ground, tile.ground);
 }
 

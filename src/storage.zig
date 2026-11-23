@@ -130,7 +130,7 @@ test "二进制存档保留背包绑定和地图对象状态" {
         .{ .index = 2, .ground = .wet, .object = .{ .crop = .{
             .kind = .potato,
             .stage = .growing,
-            .timer = 0.5,
+            .next = 2,
             .watered = true,
         } } },
         .{ .index = 3, .object = .gone },

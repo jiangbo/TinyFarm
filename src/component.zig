@@ -148,7 +148,6 @@ pub const farm = struct {
     pub const Crop = struct {
         stage: GrowthEnum = .seed,
         kind: CropEnum = .strawberry,
-        timer: f32 = 0,
         next: f32 = 0,
         watered: bool = false,
     };
