@@ -20,15 +20,16 @@ const arriveDistance2: f32 = 4.0;
 
 pub fn update(world: *ecs.World, delta: f32) void {
     const talking = world.getIdentity(Dialog);
-    var query = world.query(.{ Position, Velocity, Actor, Wander });
+    var query = world.query(.{ Position, Velocity, Actor, Wander, ?Voice, ?Life });
     while (query.next()) |row| {
         const position = row.get(Position);
         const velocity = row.getPtr(Velocity);
         const actor = row.getPtr(Actor);
         const wander = row.getPtr(Wander);
+        const voice = row.getPtr(?Voice);
 
-        if (world.getPtr(row.entity, Voice)) |voice| {
-            voice.remaining = @max(0, voice.remaining - delta);
+        if (voice) |v| {
+            v.remaining = @max(0, v.remaining - delta);
         }
 
         // 只停止正在对话的 NPC，其他 NPC 继续正常漫游。
@@ -38,19 +39,13 @@ pub fn update(world: *ecs.World, delta: f32) void {
         }
 
         // 睡觉和进食由生活系统控制，漫游只负责让出移动权。
-        if (world.get(row.entity, Life)) |life| {
+        if (row.get(?Life)) |life| {
             if (life.state != .normal) {
                 velocity.value = .zero;
                 wander.moving = false;
                 wander.stuckTimer = 0;
                 continue;
             }
-        }
-
-        // 无效参数，直接停止
-        if (wander.radius <= 0 or wander.speed <= 0) {
-            stop(actor, velocity, wander);
-            continue;
         }
 
         // 无效参数，直接停止
@@ -76,7 +71,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
         // 距离足够近，视为已到达
         if (distance2 <= arriveDistance2) {
             stop(actor, velocity, wander);
-            tryEmitVoice(world, row.entity);
+            if (voice) |v| tryEmitVoice(world, row.entity, v);
             wander.waitTimer = zhu.random.float(wander.minWait, wander.maxWait);
             continue;
         }
@@ -127,8 +122,7 @@ fn stop(actor: *Actor, velocity: *Velocity, wander: *Wander) void {
     wander.moving = false;
 }
 
-fn tryEmitVoice(world: *ecs.World, entity: ecs.Entity) void {
-    const voice = world.getPtr(entity, Voice) orelse return;
+fn tryEmitVoice(world: *ecs.World, entity: ecs.Entity, voice: *Voice) void {
     if (voice.remaining > 0) return;
     if (zhu.random.float(0, 1) > voice.probability) return;
 

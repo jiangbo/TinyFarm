@@ -24,12 +24,10 @@ pub fn update(world: *World, delta: f32) void {
     const playerShape = worldShape(world, player) orelse return;
     const notice = world.getResourcePtr(Notice).?;
 
-    var query = world.query(.{ Pickup, Position, Shape }).reverse();
+    var query = world.queryNot(.{ Pickup, Position, Shape }, .{PickupMotion}).reverse();
     while (query.next()) |row| {
-        if (world.has(row.entity, PickupMotion)) continue;
-
         const pickup = row.getPtr(Pickup);
-        const pickupShape = worldShape(world, row.entity) orelse continue;
+        const pickupShape = row.get(Shape).move(row.get(Position));
         if (!playerShape.intersect(pickupShape)) continue;
 
         const inv = world.getResourcePtr(Inventory).?;

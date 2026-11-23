@@ -20,7 +20,7 @@ pub fn update(world: *const ecs.World, delta: f32) void {
 }
 
 fn updateSleep(world: *const ecs.World) void {
-    var query = world.query(.{ Actor, Life });
+    var query = world.query(.{ Actor, Life, ?Velocity, ?Wander });
     while (query.next()) |row| {
         const actor = row.getPtr(Actor);
         const life = row.getPtr(Life);
@@ -30,12 +30,12 @@ fn updateSleep(world: *const ecs.World) void {
         life.timer = 0;
         faceFront(actor);
         actor.action = .sleep;
-        stopMoving(world, row.entity);
+        stopMoving(row.getPtr(?Velocity), row.getPtr(?Wander));
     }
 }
 
 fn updateDay(world: *const ecs.World, delta: f32) void {
-    var query = world.query(.{ Actor, Life });
+    var query = world.query(.{ Actor, Life, ?Velocity, ?Wander });
     while (query.next()) |row| {
         const actor = row.getPtr(Actor);
         const life = row.getPtr(Life);
@@ -58,14 +58,14 @@ fn updateDay(world: *const ecs.World, delta: f32) void {
                 life.timer = zhu.random.float(duration * 0.5, duration);
                 faceFront(actor);
                 actor.action = .eat;
-                stopMoving(world, row.entity);
+                stopMoving(row.getPtr(?Velocity), row.getPtr(?Wander));
             },
             .eat => {
                 // 进食期间持续保持动作并停止移动。
                 life.timer -= delta;
                 faceFront(actor);
                 actor.action = .eat;
-                stopMoving(world, row.entity);
+                stopMoving(row.getPtr(?Velocity), row.getPtr(?Wander));
                 if (life.timer > 0) continue;
 
                 // 进食结束后回到普通状态，等待下一次进食。
@@ -89,14 +89,12 @@ fn enterNormal(life: *Life) void {
     life.timer = zhu.random.float(interval * 0.5, interval);
 }
 
-fn stopMoving(world: *const ecs.World, entity: ecs.Entity) void {
-    if (world.getPtr(entity, Velocity)) |velocity| {
-        velocity.value = .zero;
-    }
-    if (world.getPtr(entity, Wander)) |wander| {
-        wander.moving = false;
-        wander.waitTimer = 0;
-        wander.stuckTimer = 0;
+fn stopMoving(velocity: ?*Velocity, wander: ?*Wander) void {
+    if (velocity) |v| v.value = .zero;
+    if (wander) |w| {
+        w.moving = false;
+        w.waitTimer = 0;
+        w.stuckTimer = 0;
     }
 }
 
