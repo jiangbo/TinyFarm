@@ -34,7 +34,7 @@ pub const Object = union(enum) {
     gone,
     crop: component.farm.Crop,
     chest: component.item.Chest,
-    product: component.item.Health,
+    product: u8,
 };
 
 pub const Tile = struct {
@@ -135,7 +135,7 @@ test "二进制存档保留背包绑定和地图对象状态" {
         } } },
         .{ .index = 3, .object = .gone },
         .{ .index = 4, .object = .{ .chest = .{ .opened = true } } },
-        .{ .index = 5, .object = .{ .product = .{ .value = 2 } } },
+        .{ .index = 5, .object = .{ .product = 2 } },
         .{ .index = 6 },
     };
     var record: Record = .{

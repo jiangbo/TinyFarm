@@ -156,7 +156,6 @@ fn loadRockTile(ctx: *Context, globalId: u32, index: usize) void {
     const entity = factory.spawnMapTile(ctx.world, //
         ctx.map, globalId, index);
     if (!ctx.world.has(entity, item.Product)) return;
-    std.debug.assert(ctx.world.has(entity, item.Health));
 
     const start = ctx.loaded.areas.items.len;
     ctx.loaded.addSolidRect(ctx.gpa, ctx.map.grid.indexToRect(index));
@@ -306,7 +305,6 @@ fn loadProp(ctx: *Context, object: tiled.Object) void {
         tile.object = .{ .kind = .chest, .entity = entity };
     }
     if (ctx.world.has(entity, item.Product)) {
-        std.debug.assert(ctx.world.has(entity, item.Health));
         if (solid.count != 0) {
             // 树这类对象按碰撞范围登记，不按更大的显示范围登记。
             for (ctx.loaded.solidAreas(solid)) |area| {
@@ -490,20 +488,18 @@ test "加载地图产出对象会按对象和 rock 图层写入目标格" {
     const tree = loaded.land.tiles[0].object.?;
     const rock = loaded.land.tiles[1].object.?;
     const treeProd = world.get(tree.entity, item.Product).?;
-    const treeHp = world.get(tree.entity, item.Health).?;
     const rockProd = world.get(rock.entity, item.Product).?;
-    const rockHp = world.get(rock.entity, item.Health).?;
     const treeCfg = factory.itemConfig(.timber);
     const rockCfg = factory.itemConfig(.stone);
 
     try std.testing.expectEqual(.product, tree.kind);
     try std.testing.expectEqual(.none, loaded.land.tiles[0].gone);
-    try std.testing.expectEqual(.timber, treeProd.value.item);
-    try std.testing.expectEqual(treeCfg.health.?, treeHp.value);
+    try std.testing.expectEqual(.timber, treeProd.drop.item);
+    try std.testing.expectEqual(treeCfg.health.?, treeProd.health);
     try std.testing.expectEqual(.product, rock.kind);
     try std.testing.expectEqual(.none, loaded.land.tiles[1].gone);
-    try std.testing.expectEqual(.stone, rockProd.value.item);
-    try std.testing.expectEqual(rockCfg.health.?, rockHp.value);
+    try std.testing.expectEqual(.stone, rockProd.drop.item);
+    try std.testing.expectEqual(rockCfg.health.?, rockProd.health);
     try std.testing.expectEqual(null, loaded.land.tiles[2].object);
     const range = world.get(rock.entity, SolidRange).?;
     const rect = testMap.grid.indexToRect(1);

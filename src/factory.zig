@@ -50,7 +50,7 @@ pub const Item = struct {
     description: []const u8,
     limit: u32 = 99,
     icon: Sprite,
-    product: ?item.Product = null,
+    product: ?item.Stack = null,
     health: ?u8 = null,
     hit: ?item.Hit = null,
 };
@@ -288,11 +288,13 @@ fn addMapItemProduct(
     const animation = tile.getProperty("anim_id", []const u8) orelse return;
     const tool = std.meta.stringToEnum(item.ItemEnum, animation) orelse return;
     const hit = itemConfig(tool).hit orelse return;
-    const config = itemConfig(hit.target);
+    const cfg = itemConfig(hit.target);
 
     // 产出和生命值来自 ZON，anim_id 只负责选中工具配置。
-    world.add(entity, config.product.?);
-    world.add(entity, item.Health{ .value = config.health.? });
+    world.add(entity, item.Product{
+        .drop = cfg.product.?,
+        .health = cfg.health.?,
+    });
 }
 
 fn chestItems(object: Object) item.Counts {

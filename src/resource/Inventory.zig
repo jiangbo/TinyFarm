@@ -66,8 +66,7 @@ pub fn use(self: *Self, itemType: ItemEnum, count: u32) bool {
 pub fn useAt(self: *Self, index: usize) Use {
     const slot = self.store.getPtr(index) orelse return .none;
     const cfg = factory.itemConfig(slot.item);
-    const effect = cfg.product orelse return .none;
-    const product = effect.value;
+    const product = cfg.product orelse return .none;
 
     if (slot.count == 1) {
         slot.* = product;

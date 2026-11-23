@@ -287,7 +287,7 @@ fn objectAt(world: *const World, tile: Land.Tile) ?Object {
     return switch (object.kind) {
         .crop => .{ .crop = world.get(object.entity, farm.Crop).? },
         .chest => .{ .chest = world.get(object.entity, item.Chest).? },
-        .product => .{ .product = world.get(object.entity, item.Health).? },
+        .product => .{ .product = world.get(object.entity, item.Product).?.health },
     };
 }
 
@@ -321,7 +321,7 @@ fn restoreObject(world: *World, index: usize, data: Object) void {
         .product => |saved| {
             const object = loaded.land.tiles[index].object.?;
             std.debug.assert(object.kind == .product);
-            world.getPtr(object.entity, item.Health).?.* = saved;
+            world.getPtr(object.entity, item.Product).?.health = saved;
         },
     }
 }
@@ -589,17 +589,15 @@ test "恢复地图产出对象只写回生命" {
     defer world.deinit();
 
     const entity = world.createEntity();
-    world.add(entity, item.Product{ .value = .one(.stone) });
-    world.add(entity, item.Health{ .value = 1 });
+    world.add(entity, item.Product{ .drop = .one(.stone), .health = 1 });
     loaded.land.tiles[0].object = .{ .kind = .product, .entity = entity };
 
-    restoreObject(&world, 0, .{ .product = .{ .value = 4 } });
+    restoreObject(&world, 0, .{ .product = 4 });
 
     const product = world.get(entity, item.Product).?;
-    const health = world.get(entity, item.Health).?;
-    try std.testing.expectEqual(.stone, product.value.item);
-    try std.testing.expectEqual(1, product.value.count);
-    try std.testing.expectEqual(4, health.value);
+    try std.testing.expectEqual(.stone, product.drop.item);
+    try std.testing.expectEqual(1, product.drop.count);
+    try std.testing.expectEqual(4, product.health);
 }
 
 test "恢复 gone 只清除产出对象自己的碰撞矩形" {
@@ -611,8 +609,7 @@ test "恢复 gone 只清除产出对象自己的碰撞矩形" {
     defer world.deinit();
 
     const entity = world.createEntity();
-    world.add(entity, item.Product{ .value = .one(.stone) });
-    world.add(entity, item.Health{ .value = 1 });
+    world.add(entity, item.Product{ .drop = .one(.stone), .health = 1 });
     loaded.land.tiles[0].object = .{ .kind = .product, .entity = entity };
     const rock = zhu.Rect.init(.xy(4, 0), .xy(4, 16));
     const terrain = zhu.Rect.init(.xy(8, 0), .xy(8, 16));

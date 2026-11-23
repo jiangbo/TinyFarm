@@ -223,9 +223,7 @@
             .category = "作物",
             .description = "成熟后收获的水果。",
             .limit = 99,
-            .product = .{
-                .value = .{ .item = .strawberry_seed, .count = 3 },
-            },
+            .product = .{ .item = .strawberry_seed, .count = 3 },
             .icon = .{
                 // .path = "farm-rpg/Icons/Crops.png"
                 .imageId = 2346538291,
@@ -238,9 +236,7 @@
             .category = "作物",
             .description = "成熟后收获的根茎作物。",
             .limit = 99,
-            .product = .{
-                .value = .{ .item = .potato_seed, .count = 3 },
-            },
+            .product = .{ .item = .potato_seed, .count = 3 },
             .icon = .{
                 // .path = "farm-rpg/Icons/Crops.png"
                 .imageId = 2346538291,
@@ -253,9 +249,7 @@
             .category = "材料",
             .description = "砍伐树木得到的基础材料。",
             .limit = 99,
-            .product = .{
-                .value = .{ .item = .timber, .count = 3 },
-            },
+            .product = .{ .item = .timber, .count = 3 },
             .health = 5,
             .icon = .{
                 // .path = "farm-rpg/Icons/Weapons/14.png"
@@ -272,9 +266,7 @@
             .category = "材料",
             .description = "敲碎石块得到的基础材料。",
             .limit = 99,
-            .product = .{
-                .value = .{ .item = .stone, .count = 3 },
-            },
+            .product = .{ .item = .stone, .count = 3 },
             .health = 3,
             .icon = .{
                 // .path = "farm-rpg/Icons/Weapons/14.png"

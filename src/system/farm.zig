@@ -16,7 +16,6 @@ const CropEnum = component.farm.CropEnum;
 const ItemEnum = component.item.ItemEnum;
 const Pickup = component.item.Pickup;
 const Product = component.item.Product;
-const Health = component.item.Health;
 const event = component.event;
 const World = ecs.World;
 
@@ -87,25 +86,24 @@ fn hitProduct(world: *World, want: WantUse) void {
     const hit = factory.itemConfig(want.item).hit.?;
     const tile = map.getTile(want.target) orelse return;
     const entity = tile.get(.product) orelse return;
-    const product = world.get(entity, Product).?;
-    if (product.value.item != hit.target) return;
+    const product = world.getPtr(entity, Product).?;
+    if (product.drop.item != hit.target) return;
 
-    const health = world.getPtr(entity, Health).?;
-    std.debug.assert(health.value > 0);
-    health.value -= 1;
+    std.debug.assert(product.health > 0);
+    product.health -= 1;
     // reset 后动画系统会在下一次 update 立即处理第一帧。
     if (world.getPtr(entity, Animation)) |a| a.reset();
 
     world.addEvent(event.SoundPlay{ .id = toolSound(want.item) });
-    if (health.value != 0) return;
+    if (product.health != 0) return;
 
-    // value.count 表示最大掉落数量，实际掉落 1 到 count 个，
+    // drop.count 表示最大掉落数量，实际掉落 1 到 count 个，
     // 合并为一个带数量的掉落物，拾取时一次性获得全部。
-    std.debug.assert(product.value.count > 0);
-    const dropCount = zhu.random.intMost(u32, 1, product.value.count);
+    std.debug.assert(product.drop.count > 0);
+    const dropCount = zhu.random.intMost(u32, 1, product.drop.count);
     const origin = want.target.add(map.grid.halfCell());
     factory.spawnPickup(world, .{
-        .item = product.value.item,
+        .item = product.drop.item,
         .count = dropCount,
         .origin = origin,
     });
@@ -178,15 +176,9 @@ fn setActiveItem(world: *World, item: ItemEnum, count: u32) void {
     _ = inv.add(item, count);
 }
 
-fn addProductEntity(
-    world: *World,
-    target: zhu.Vector2,
-    product: Product,
-    health: u8,
-) ecs.Entity {
+fn addProduct(world: *World, target: zhu.Vector2, product: Product) ecs.Entity {
     const entity = world.createEntity();
     world.add(entity, product);
-    world.add(entity, Health{ .value = health });
     map.getTile(target).?.set(.product, entity);
     return entity;
 }
@@ -371,12 +363,7 @@ test "斧头命中木材产出对象会减少生命" {
     map.load(std.testing.allocator, &world, testMap);
     defer map.unload(std.testing.allocator);
 
-    const entity = addProductEntity(
-        &world,
-        target,
-        Product{ .value = .one(.timber) },
-        2,
-    );
+    const entity = addProduct(&world, target, .{ .drop = .one(.timber), .health = 2 });
     const player = world.createIdentity(Player);
     world.add(player, WantUse{ .item = .axe, .target = target });
     world.add(player, UseFrame{});
@@ -384,7 +371,7 @@ test "斧头命中木材产出对象会减少生命" {
     update(&world);
 
     try std.testing.expectEqual(entity, map.getTile(target).?.get(.product).?);
-    try std.testing.expectEqual(1, world.get(entity, Health).?.value);
+    try std.testing.expectEqual(1, world.get(entity, Product).?.health);
     try std.testing.expectEqual(0, world.getComponents(Pickup).len);
 
     const sounds = world.getEvent(event.SoundPlay);
@@ -399,12 +386,7 @@ test "斧头命中产出对象会播放地图资源动画" {
     map.load(std.testing.allocator, &world, testMap);
     defer map.unload(std.testing.allocator);
 
-    const entity = addProductEntity(
-        &world,
-        target,
-        Product{ .value = .one(.timber) },
-        2,
-    );
+    const entity = addProduct(&world, target, .{ .drop = .one(.timber), .health = 2 });
     const image = zhu.Image{ .size = .xy(32, 16) };
     const frames = [_]zhu.graphics.Frame{
         .{ .offset = .xy(0, 0), .duration = 0.1 },
@@ -432,12 +414,7 @@ test "错误工具不会命中产出对象" {
     map.load(std.testing.allocator, &world, testMap);
     defer map.unload(std.testing.allocator);
 
-    const entity = addProductEntity(
-        &world,
-        target,
-        Product{ .value = .one(.stone) },
-        2,
-    );
+    const entity = addProduct(&world, target, .{ .drop = .one(.stone), .health = 2 });
     const player = world.createIdentity(Player);
     world.add(player, WantUse{ .item = .axe, .target = target });
     world.add(player, UseFrame{});
@@ -445,7 +422,7 @@ test "错误工具不会命中产出对象" {
     update(&world);
 
     try std.testing.expectEqual(entity, map.getTile(target).?.get(.product).?);
-    try std.testing.expectEqual(2, world.get(entity, Health).?.value);
+    try std.testing.expectEqual(2, world.get(entity, Product).?.health);
     try std.testing.expectEqual(0, world.getComponents(Pickup).len);
     try std.testing.expectEqual(0, world.getEvent(event.SoundPlay).len);
 }
@@ -458,12 +435,10 @@ test "镐子击碎石头会生成掉落" {
     map.load(std.testing.allocator, &world, testMap);
     defer map.unload(std.testing.allocator);
 
-    const entity = addProductEntity(
-        &world,
-        target,
-        Product{ .value = .{ .item = .stone, .count = 2 } },
-        1,
-    );
+    const entity = addProduct(&world, target, .{
+        .drop = .{ .item = .stone, .count = 2 },
+        .health = 1,
+    });
     const player = world.createIdentity(Player);
     world.add(player, WantUse{ .item = .pickaxe, .target = target });
     world.add(player, UseFrame{});
