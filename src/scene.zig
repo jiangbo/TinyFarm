@@ -25,18 +25,11 @@ const Position = component.Position;
 const Transition = component.map.Transition;
 const Trigger = component.map.Trigger;
 
-const MapFade = struct {
-    const Phase = enum { out, in };
-
-    phase: ?Phase = null,
-    timer: zhu.Timer = .init(0.15),
-};
-
 const Scene = union(enum) { title, play: ?u8 };
 
 pub var world: World = undefined;
 var allocator: zhu.Allocator = undefined;
-var mapFade: MapFade = .{};
+var mapFade: zhu.widget.Fade = .init(0.15);
 var current: Scene = .title;
 var pending: ?Scene = null;
 var config: storage.Config = .{};
@@ -99,7 +92,7 @@ pub fn draw() void {
             zhu.camera.push(.window);
             defer zhu.camera.pop();
             ui.draw(&world);
-            if (mapFade.phase) |phase| drawMapFade(phase);
+            mapFade.draw(.init(.zero, zhu.camera.size), .black);
         },
     }
 }
@@ -134,8 +127,7 @@ fn updatePlay(delta: f32) void {
 
     // 已提交的切图请求先进入过渡，不再瞬时换图。
     if (world.getByIdentity(actor.Player, Transition) != null) {
-        mapFade.phase = .out;
-        mapFade.timer.restart();
+        mapFade.fadeOut();
         return;
     }
 
@@ -144,11 +136,10 @@ fn updatePlay(delta: f32) void {
 }
 
 fn updateMapFade(delta: f32) bool {
-    const phase = mapFade.phase orelse return false;
-    if (mapFade.timer.updateRunning(delta)) return true;
+    if (!mapFade.active()) return false;
 
-    switch (phase) {
-        .out => {
+    if (mapFade.update(delta)) |event| switch (event) {
+        .covered => {
             const playerEntity = world.getIdentity(actor.Player).?;
             const request = world.get(playerEntity, Transition).?;
             map.exit(allocator, &world);
@@ -157,11 +148,10 @@ fn updateMapFade(delta: f32) bool {
             spawnPlayer(request.targetId);
             system.light.update(&world);
             system.sort.update(&world);
-            mapFade.phase = .in;
-            mapFade.timer.restart();
+            mapFade.fadeIn();
         },
-        .in => mapFade = .{},
-    }
+        .clear => {},
+    };
     return true;
 }
 
@@ -171,7 +161,7 @@ fn applyScene() void {
     switch (current) {
         .title => title.exit(),
         .play => {
-            mapFade = .{};
+            mapFade = .init(0.15);
             map.exit(allocator, &world);
             resetWorld();
         },
@@ -318,17 +308,4 @@ fn capturePlayer() storage.Player {
 fn resetWorld() void {
     // 重建世界时保留全部资源。
     world.resetKeepResources();
-}
-
-fn drawMapFade(phase: MapFade.Phase) void {
-    const alpha = switch (phase) {
-        .out => mapFade.timer.progress(),
-        .in => 1 - mapFade.timer.progress(),
-    };
-
-    zhu.camera.push(.window);
-    defer zhu.camera.pop();
-
-    const rect = zhu.Rect.init(.zero, zhu.camera.size);
-    zhu.batch.drawRect(rect, .{ .color = zhu.Color.black.withAlpha(alpha) });
 }

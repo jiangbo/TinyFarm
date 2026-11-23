@@ -33,7 +33,6 @@ fn followPlayer(world: *const World, delta: f32) void {
 
     const speed: f32 = 9;
     zhu.camera.smoothFollow(position, speed, delta);
-    zhu.camera.snap = true;
 }
 
 test "移动系统会按速度更新位置" {

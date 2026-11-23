@@ -8,6 +8,7 @@ var soundBuffer: [20]zhu.audio.Sound = undefined;
 var debug = false;
 
 pub fn init(allocator: zhu.Allocator) void {
+    zhu.camera.snap = true;
     _ = zhu.loadAtlas(@import("zon/atlas.zon"), .{});
     zhu.batch.init(&commandBuffer, zhu.getImage("circle.png").?);
     zhu.audio.init(&soundBuffer, .{ .sample_rate = 11025 });
