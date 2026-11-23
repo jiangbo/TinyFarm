@@ -100,7 +100,7 @@ test "interact 按下交互键会给最近目标挂交互标记" {
     defer zhu.window.resetInput();
 
     const oldGrid = map.grid;
-    map.grid = .{ .width = 3, .height = 3, .cell = 16 };
+    map.grid = .{ .width = 3, .height = 3, .cellSide = 16 };
     defer map.grid = oldGrid;
 
     var world = World.init(std.testing.allocator);
@@ -123,7 +123,7 @@ test "interact 对话中不会重新寻找目标" {
     defer zhu.window.resetInput();
 
     const oldGrid = map.grid;
-    map.grid = .{ .width = 3, .height = 3, .cell = 16 };
+    map.grid = .{ .width = 3, .height = 3, .cellSide = 16 };
     defer map.grid = oldGrid;
 
     var world = World.init(std.testing.allocator);
@@ -159,7 +159,7 @@ test "interact 下一帧会清理上一次交互目标" {
 
 test "interact 玩家紧贴 NPC 上方朝下时探测框能命中" {
     const oldGrid = map.grid;
-    map.grid = .{ .width = 3, .height = 3, .cell = 16 };
+    map.grid = .{ .width = 3, .height = 3, .cellSide = 16 };
     defer map.grid = oldGrid;
 
     var world = World.init(std.testing.allocator);

@@ -2,7 +2,7 @@
     .grid = .{
         .width = 15,
         .height = 15,
-        .cell = 16,
+        .cellSide = 16,
     },
     .properties = .{.{ .name = "ambient", .value = .{ .class = .{ .type = "Ambient", .properties = .{
         .{ .name = "blue", .value = .{ .float = 0.7 } },

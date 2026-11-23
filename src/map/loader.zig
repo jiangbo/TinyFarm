@@ -7,8 +7,7 @@ const factory = @import("../factory.zig");
 const Land = @import("Land.zig");
 
 const tiled = zhu.extend.tiled;
-const Grid = zhu.extend.spatial.Grid;
-const SolidMask = zhu.extend.spatial.SolidMask;
+const spatial = zhu.extend.spatial;
 const World = ecs.World;
 const Position = component.Position;
 const actor = component.actor;
@@ -22,29 +21,17 @@ const AnimatedTile = struct { vertex: usize, animation: zhu.Animation };
 
 pub const Loaded = struct {
     land: Land = .{},
-    mask: SolidMask = undefined,
+    collision: spatial.Static = .{},
     areas: std.ArrayList(zhu.Rect) = .empty,
     vertexes: std.ArrayList(zhu.Vertex) = .empty,
     animatedTiles: std.ArrayList(AnimatedTile) = .empty,
     frontStart: usize = 0,
     loaded: bool = false,
 
-    pub fn init(gpa: zhu.Allocator, grid: Grid) Loaded {
-        return .{
-            .land = Land.init(gpa, grid),
-            .mask = SolidMask.init(gpa, .{
-                .width = grid.width * 2,
-                .height = grid.height * 2,
-                .cell = @divExact(grid.cell, 2),
-            }) catch zhu.oom(),
-            .loaded = true,
-        };
-    }
-
     pub fn deinit(self: *Loaded, gpa: zhu.Allocator) void {
         if (!self.loaded) return;
         self.land.deinit(gpa);
-        self.mask.deinit(gpa);
+        self.collision.deinit(gpa);
         self.areas.clearAndFree(gpa);
         self.vertexes.clearAndFree(gpa);
         self.animatedTiles.clearAndFree(gpa);
@@ -60,7 +47,7 @@ pub const Loaded = struct {
         }
     }
 
-    pub fn addSolidRect(self: *Loaded, gpa: zhu.Allocator, rect: zhu.Rect) void {
+    fn addSolidRect(self: *Loaded, gpa: zhu.Allocator, rect: zhu.Rect) void {
         std.debug.assert(rect.size.x > 0 and rect.size.y > 0);
         self.areas.append(gpa, rect) catch zhu.oom();
     }
@@ -79,7 +66,14 @@ const Context = struct {
 };
 
 pub fn load(gpa: zhu.Allocator, world: *World, map: tiled.Map) Loaded {
-    var result = Loaded.init(gpa, map.grid);
+    const grid = map.grid;
+    var result: Loaded = .{ .land = Land.init(gpa, grid) };
+    result.collision.mask = spatial.SolidMask.init(gpa, .{
+        .width = grid.width * 2,
+        .height = grid.height * 2,
+        .cellSide = @divExact(grid.cellSide, 2),
+    }) catch zhu.oom();
+
     var ctx = Context{
         .gpa = gpa,
         .map = map,
@@ -87,6 +81,11 @@ pub fn load(gpa: zhu.Allocator, world: *World, map: tiled.Map) Loaded {
         .loaded = &result,
     };
     parseLayers(&ctx);
+    // 建表后不再追加矩形，销毁物件只需将对应矩形置空。
+    const index = spatial.StaticIndex.build(gpa, grid, result.areas.items);
+    result.collision.index = index catch zhu.oom();
+    result.collision.bounds = .init(.zero, grid.size());
+    result.loaded = true;
     return result;
 }
 
@@ -119,9 +118,9 @@ fn parseLayers(ctx: *Context) void {
 }
 
 fn parseSolidLayer(ctx: *Context, layer: *const tiled.Layer) void {
-    const mask = &ctx.loaded.mask;
+    const collision = &ctx.loaded.collision;
     for (layer.data, 0..) |gid, index| {
-        if (gid != 0) mask.setCellsInRect(ctx.map.grid.indexToRect(index), true);
+        if (gid != 0) collision.setCellsInRect(ctx.map.grid.indexToRect(index));
     }
 }
 
@@ -202,7 +201,7 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
                 continue;
             },
         };
-        ctx.loaded.mask.setCellsInRect(rect, true);
+        ctx.loaded.collision.setCellsInRect(rect);
     }
 }
 

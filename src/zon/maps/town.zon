@@ -2,7 +2,7 @@
     .grid = .{
         .width = 35,
         .height = 25,
-        .cell = 16,
+        .cellSide = 16,
     },
     .backgroundColor = .{
         .r = 64,

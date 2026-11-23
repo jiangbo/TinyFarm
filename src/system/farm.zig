@@ -119,7 +119,7 @@ fn toolSound(tool: ItemEnum) component.sound.Id {
 }
 
 const testMap = zhu.extend.tiled.Map{
-    .grid = .{ .width = 4, .height = 5, .cell = 16 },
+    .grid = .{ .width = 4, .height = 5, .cellSide = 16 },
     .layers = &.{.{
         .id = 1,
         .name = "ground",

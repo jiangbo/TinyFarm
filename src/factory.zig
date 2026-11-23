@@ -395,7 +395,6 @@ pub fn spawnCrop(
 ) Entity {
     const stage = zon.crops[@backingInt(kind)].stages[0];
     const entity = world.createEntity();
-    // kind 写入组件，后续 advanceCrop 依赖它查找正确的阶段贴图
     world.add(entity, farm.Crop{ .kind = kind, .next = stage.duration });
     world.add(entity, component.Position.xy(position.x, position.y));
     world.add(entity, render.Sprite{
@@ -405,18 +404,6 @@ pub fn spawnCrop(
     world.add(entity, render.Render{ .layer = .crop });
     world.add(entity, render.YSort{});
     return entity;
-}
-
-pub fn advanceCrop(crop: *farm.Crop) render.Sprite {
-    crop.timer = 0;
-    crop.stage = zhu.enums.next(crop.stage);
-    // 用 crop.kind 查找该作物对应阶段的贴图
-    const stage = cropStage(crop.kind, crop.stage);
-    crop.next = stage.duration;
-    return .{
-        .image = resolveImage(stage.sprite),
-        .offset = stage.sprite.offset,
-    };
 }
 
 pub fn spawnPickup(world: *World, args: struct {
@@ -542,24 +529,6 @@ test "spawnCrop 会按作物类型设置 kind 和 next" {
     }
 }
 
-test "advanceCrop 会推进阶段并保持 kind" {
-    const kinds = [_]farm.CropEnum{ .strawberry, .potato };
-    for (kinds) |kind| {
-        const config = zon.crops[@backingInt(kind)];
-        var crop = farm.Crop{
-            .kind = kind,
-            .next = config.stages[0].duration,
-        };
-
-        _ = advanceCrop(&crop);
-
-        try expectEqual(farm.GrowthEnum.sprout, crop.stage);
-        try expectEqual(kind, crop.kind);
-        try expectEqual(config.stages[1].duration, crop.next);
-        try expectEqual(0, crop.timer);
-    }
-}
-
 test "地图摆件按底边定位生成实体" {
     const imageId = 1234;
     const tileSetId = 5678;
@@ -583,7 +552,7 @@ test "地图摆件按底边定位生成实体" {
         },
     };
     const testMap = tiled.Map{
-        .grid = .{ .width = 1, .height = 1, .cell = 16 },
+        .grid = .{ .width = 1, .height = 1, .cellSide = 16 },
         .layers = &.{},
         .tileSets = &tileSets,
     };
@@ -643,7 +612,7 @@ test "地图摆件优先用碰撞底边作为排序点" {
         .tiles = &tiles,
     }};
     const testMap = tiled.Map{
-        .grid = .{ .width = 1, .height = 1, .cell = 16 },
+        .grid = .{ .width = 1, .height = 1, .cellSide = 16 },
         .layers = &.{},
         .tileSets = &tileSets,
     };
@@ -702,7 +671,7 @@ test "带 anim_id 的地图摆件会创建停止的非循环动画" {
         },
     };
     const testMap = tiled.Map{
-        .grid = .{ .width = 1, .height = 1, .cell = 16 },
+        .grid = .{ .width = 1, .height = 1, .cellSide = 16 },
         .layers = &.{},
         .tileSets = &tileSets,
     };

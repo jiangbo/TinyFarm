@@ -2,7 +2,7 @@
     .grid = .{
         .width = 30,
         .height = 17,
-        .cell = 16,
+        .cellSide = 16,
     },
     .properties = .{},
     .layers = .{

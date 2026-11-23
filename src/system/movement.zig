@@ -54,7 +54,7 @@ test "移动系统会按速度更新位置" {
 }
 
 const testMap = zhu.extend.tiled.Map{
-    .grid = .{ .width = 30, .height = 17, .cell = 16 },
+    .grid = .{ .width = 30, .height = 17, .cellSide = 16 },
     .layers = &.{},
 };
 

@@ -106,7 +106,7 @@ fn appendVertex(position: zhu.Vector2, image: zhu.Image) void {
 }
 
 test "锄地会记录目标格" {
-    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cellSide = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -116,7 +116,7 @@ test "锄地会记录目标格" {
 }
 
 test "浇水只会影响已有耕地" {
-    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cellSide = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -129,7 +129,7 @@ test "浇水只会影响已有耕地" {
 }
 
 test "目标格有作物时不会锄地" {
-    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cellSide = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -140,7 +140,7 @@ test "目标格有作物时不会锄地" {
 }
 
 test "锄地要求地块为空" {
-    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cellSide = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -157,7 +157,7 @@ test "锄地要求地块为空" {
 }
 
 test "种植只要求已有耕地且没有对象" {
-    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cellSide = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
@@ -174,7 +174,7 @@ test "种植只要求已有耕地且没有对象" {
 }
 
 test "浇水要求已有耕地" {
-    const grid = Grid{ .width = 3, .height = 4, .cell = 16 };
+    const grid = Grid{ .width = 3, .height = 4, .cellSide = 16 };
     var land = Land.init(std.testing.allocator, grid);
     defer land.deinit(std.testing.allocator);
 
