@@ -33,7 +33,7 @@ pub fn init() void {
     };
 }
 
-pub fn draw(world: *World) void {
+pub fn draw(world: *const World) void {
     const clock = world.getResourcePtr(Clock).?;
 
     zhu.camera.push(.windowScale(.xy(10, 10), .all(uiScale)));

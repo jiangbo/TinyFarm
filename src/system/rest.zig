@@ -8,7 +8,7 @@ const World = ecs.World;
 const Interact = component.actor.Interact;
 const Rest = component.map.Rest;
 
-pub fn update(world: *World) void {
+pub fn update(world: *const World) void {
     const target = world.getIdentity(Interact) orelse return;
     if (!world.has(target, Rest)) return;
 

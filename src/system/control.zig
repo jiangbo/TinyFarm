@@ -33,7 +33,7 @@ pub fn update(world: *World) void {
     updateMovement(world, player);
 }
 
-fn updateMovement(world: *World, player: Entity) void {
+fn updateMovement(world: *const World, player: Entity) void {
     if (world.has(player, Busy)) return;
 
     const direction = readDirection();
@@ -61,7 +61,7 @@ fn readDirection() zhu.Vector2 {
     return direction;
 }
 
-fn targetPosition(world: *World, player: Entity) ?zhu.Vector2 {
+fn targetPosition(world: *const World, player: Entity) ?zhu.Vector2 {
     if (input.mouseCaptured) return null;
 
     const playerPos = world.get(player, Position).?;

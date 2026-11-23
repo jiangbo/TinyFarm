@@ -80,7 +80,7 @@ fn updateMotion(world: *World, delta: f32) void {
     }
 }
 
-fn worldShape(world: *World, entity: ecs.Entity) ?Shape {
+fn worldShape(world: *const World, entity: ecs.Entity) ?Shape {
     const position = world.get(entity, Position) orelse return null;
     const shape = world.get(entity, Shape) orelse return null;
     return shape.move(position);

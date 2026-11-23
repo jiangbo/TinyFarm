@@ -50,7 +50,7 @@ pub fn init() void {
     wetLandImage = landImage.sub(.init(.xy(192, 48), .xy(16, 16)));
 }
 
-pub fn deinit(gpa: zhu.Allocator, world: *World) void {
+pub fn deinit(gpa: zhu.Allocator, world: *const World) void {
     if (loaded.loaded) exit(gpa, world);
     for (std.enums.values(Id)) |id| {
         gpa.free(states.get(id).tiles);
@@ -83,7 +83,7 @@ pub fn enter(gpa: zhu.Allocator, world: *World, id: Id) void {
     _ = factory.spawnMapTrigger(world, trigger);
 }
 
-pub fn update(world: *World, delta: f32) void {
+pub fn update(world: *const World, delta: f32) void {
     loaded.updateAnimations(delta);
     for (world.getEvent(component.event.DayChanged)) |_| {
         for (loaded.land.tiles) |*tile| {
@@ -101,7 +101,7 @@ pub fn update(world: *World, delta: f32) void {
     }
 }
 
-pub fn exit(gpa: zhu.Allocator, world: *World) void {
+pub fn exit(gpa: zhu.Allocator, world: *const World) void {
     saveCurrent(gpa, world);
     unload(gpa);
 }
@@ -126,7 +126,7 @@ pub fn resetState() void {
     }
 }
 
-pub fn capture(gpa: zhu.Allocator, world: *World) storage.MapRecord {
+pub fn capture(gpa: zhu.Allocator, world: *const World) storage.MapRecord {
     saveCurrent(gpa, world);
     var result: storage.MapRecord = .{};
 
@@ -175,7 +175,7 @@ pub fn getTile(position: zhu.Vector2) ?*Land.Tile {
 }
 
 /// 按地形、对象矩形、动态阻挡实体和地图边界做连续 2D 滑墙移动，返回实际位移。
-pub fn slide(world: *World, entity: Entity, delta: zhu.Vector2) zhu.Vector2 {
+pub fn slide(world: *const World, entity: Entity, delta: zhu.Vector2) zhu.Vector2 {
     const position = world.get(entity, Position).?;
     const body = world.get(entity, motion.Shape).?.move(position);
     var s = spatial.Slide.init(body, delta);
@@ -207,7 +207,7 @@ pub fn clearProduct(world: *World, position: zhu.Vector2) void {
     clearProductIndex(world, grid.worldToIndex(position).?);
 }
 
-fn saveCurrent(gpa: zhu.Allocator, world: *World) void {
+fn saveCurrent(gpa: zhu.Allocator, world: *const World) void {
     const day = world.getResourcePtr(Clock).?.*.day;
     const state = ensure(gpa, current, loaded.land.tiles.len, day);
     for (loaded.land.tiles, 0..) |tile, index| {
@@ -282,7 +282,7 @@ fn restoreMap(gpa: zhu.Allocator, id: Id, saved: SaveMap, day: u32) void {
     state.day = saved.day;
 }
 
-fn objectAt(world: *World, tile: Land.Tile) ?Object {
+fn objectAt(world: *const World, tile: Land.Tile) ?Object {
     const object = tile.object orelse return null;
     return switch (object.kind) {
         .crop => .{ .crop = world.get(object.entity, farm.Crop).? },
@@ -382,7 +382,7 @@ fn advanceCropOneDay(crop: *farm.Crop, watered: bool) bool {
     return true;
 }
 
-fn refreshCropSprite(world: *World, entity: Entity, crop: farm.Crop) void {
+fn refreshCropSprite(world: *const World, entity: Entity, crop: farm.Crop) void {
     const cfg = factory.cropStage(crop.kind, crop.stage);
     world.getPtr(entity, render.Sprite).?.* = .{
         .image = factory.resolveImage(cfg.sprite),

@@ -19,7 +19,7 @@ pub fn reset() void {
     drag.reset();
 }
 
-pub fn update(world: *World) void {
+pub fn update(world: *const World) void {
     const inventory = world.getResourcePtr(Inventory).?;
     const notice = world.getResourcePtr(Notice).?;
 
@@ -33,7 +33,7 @@ pub fn update(world: *World) void {
     drag.update(inventory, canDrag);
 }
 
-pub fn draw(world: *World) void {
+pub fn draw(world: *const World) void {
     const inventory = world.getResourcePtr(Inventory).?;
 
     bag.draw(inventory, drag.hiddenBag());

@@ -13,7 +13,7 @@ const Blocking = component.motion.Blocking;
 const World = ecs.World;
 const Entity = ecs.Entity;
 
-pub fn update(world: *World, delta: f32) void {
+pub fn update(world: *const World, delta: f32) void {
     var query = world.query(.{ Position, Velocity });
     while (query.next()) |row| {
         const velocity = row.get(Velocity);
@@ -27,7 +27,7 @@ pub fn update(world: *World, delta: f32) void {
     followPlayer(world, delta);
 }
 
-fn followPlayer(world: *World, delta: f32) void {
+fn followPlayer(world: *const World, delta: f32) void {
     const entity = world.getIdentity(Player) orelse return;
     const position = world.get(entity, Position).?;
 

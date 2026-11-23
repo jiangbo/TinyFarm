@@ -69,14 +69,14 @@ pub const Record = struct {
 var config: Config = .{};
 pub var slots: [10]Slot = @splat(.empty);
 
-pub fn init(world: *World) Config {
+pub fn init(world: *const World) Config {
     config = load(Config, "config.bin", .{});
     slots = load(@TypeOf(slots), "saves/slots.bin", @splat(.empty));
     sync(world, config);
     return config;
 }
 
-pub fn update(world: *World, cfg: Config) void {
+pub fn update(world: *const World, cfg: Config) void {
     if (std.meta.eql(config, cfg)) return;
 
     sync(world, cfg);
@@ -87,7 +87,7 @@ pub fn update(world: *World, cfg: Config) void {
     config = cfg;
 }
 
-fn sync(world: *World, cfg: Config) void {
+fn sync(world: *const World, cfg: Config) void {
     world.getResourcePtr(Speed).?.value = cfg.speed;
     zhu.music.setVolume(cfg.music);
     zhu.sound.setVolume(cfg.sound);

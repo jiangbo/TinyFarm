@@ -43,7 +43,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
     }
 }
 
-fn updateActor(world: *ecs.World) void {
+fn updateActor(world: *const ecs.World) void {
     var query = world.query(.{ Actor, Animation, Sprite });
     while (query.next()) |row| {
         const actor = row.getPtr(Actor);

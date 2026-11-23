@@ -72,7 +72,7 @@ fn markFacingHits(world: *World) void {
     }
 }
 
-fn targetCenter(world: *World, entity: Entity) Position {
+fn targetCenter(world: *const World, entity: Entity) Position {
     const position = world.get(entity, Position).?;
     const shape = world.get(entity, Shape).?;
     return shape.move(position).toRect().center();

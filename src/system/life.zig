@@ -10,7 +10,7 @@ const Life = component.actor.Life;
 const Velocity = component.motion.Velocity;
 const Wander = component.actor.Wander;
 
-pub fn update(world: *ecs.World, delta: f32) void {
+pub fn update(world: *const ecs.World, delta: f32) void {
     const clock = world.getResourcePtr(Clock).?.*;
     if (clock.period == .night) {
         return updateSleep(world);
@@ -19,7 +19,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
     updateDay(world, delta);
 }
 
-fn updateSleep(world: *ecs.World) void {
+fn updateSleep(world: *const ecs.World) void {
     var query = world.query(.{ Actor, Life });
     while (query.next()) |row| {
         const actor = row.getPtr(Actor);
@@ -34,7 +34,7 @@ fn updateSleep(world: *ecs.World) void {
     }
 }
 
-fn updateDay(world: *ecs.World, delta: f32) void {
+fn updateDay(world: *const ecs.World, delta: f32) void {
     var query = world.query(.{ Actor, Life });
     while (query.next()) |row| {
         const actor = row.getPtr(Actor);
@@ -89,7 +89,7 @@ fn enterNormal(life: *Life) void {
     life.timer = zhu.random.float(interval * 0.5, interval);
 }
 
-fn stopMoving(world: *ecs.World, entity: ecs.Entity) void {
+fn stopMoving(world: *const ecs.World, entity: ecs.Entity) void {
     if (world.getPtr(entity, Velocity)) |velocity| {
         velocity.value = .zero;
     }

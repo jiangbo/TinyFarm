@@ -15,13 +15,13 @@ pub fn init() void {
     });
 }
 
-pub fn update(world: *World, delta: f32) void {
+pub fn update(world: *const World, delta: f32) void {
     const data = world.getResourcePtr(Notice).?;
     if (data.entry.timer <= 0) return;
     data.entry.timer -= delta;
 }
 
-pub fn draw(world: *World) void {
+pub fn draw(world: *const World) void {
     const data = world.getResourcePtr(Notice).?;
     if (data.entry.timer <= 0) return;
 

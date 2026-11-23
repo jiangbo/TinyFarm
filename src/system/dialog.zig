@@ -48,7 +48,7 @@ fn startDialog(world: *World, target: Entity) void {
     world.setIdentity(target, Dialog);
 }
 
-fn facePlayer(world: *World, target: Entity) void {
+fn facePlayer(world: *const World, target: Entity) void {
     const player = world.getIdentity(Player).?;
     const playerPos = world.get(player, Position).?;
     const targetPos = world.get(target, Position).?;

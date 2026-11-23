@@ -126,7 +126,7 @@ pub fn close() void {
     popupMessage = null;
 }
 
-pub fn draw(world: *ecs.World) void {
+pub fn draw(world: *const ecs.World) void {
     time.draw(world);
     pauseButton.draw();
     inventory.draw(world);
