@@ -61,6 +61,7 @@ pub const CropConfig = struct { stages: [4]CropStage };
 
 pub const Config = struct {
     player: Actor,
+    playerLight: light.Point,
     items: [@typeInfo(item.ItemEnum).@"enum".field_names.len]Item,
     animals: [@typeInfo(actor.AnimalEnum).@"enum".field_names.len]Character,
     friend: Character,
@@ -134,6 +135,8 @@ pub fn spawnPlayer(world: *World, spawn: zhu.Vector2, facing: actor.Facing) void
     world.add(player, render.Render{ .layer = .actor });
     world.add(player, render.YSort{});
     world.add(player, ui.Target{});
+    world.add(player, zon.playerLight);
+    world.add(player, light.Disabled{});
 }
 
 pub fn spawnAnimal(world: *World, kind: actor.Animal) Entity {

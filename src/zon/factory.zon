@@ -1,4 +1,10 @@
 .{
+    .playerLight = .{
+        .radius = 128,
+        .offset = .{ .x = 0, .y = -10 },
+        .color = .{ .r = 255, .g = 242, .b = 204, .a = 255 },
+        .intensity = 1,
+    },
     .player = .{
         // .path = "farm-rpg/Character and Portrait/Character/Pre-made/Alex/Idle.png",
         .sprite = .{
