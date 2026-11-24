@@ -6,8 +6,6 @@ const Entry = struct { type: Action, value: []const zhu.key.Code };
 const zon: []const Entry = @import("zon/input.zon");
 const keys = zhu.enums.fromEntries(Entry, zon);
 
-pub var mouseCaptured: bool = false;
-
 pub fn held(action: Action) bool {
     return zhu.key.anyHeld(keys.get(action));
 }

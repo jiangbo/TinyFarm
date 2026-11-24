@@ -4,7 +4,6 @@ const ecs = @import("ecs");
 
 const component = @import("component.zig");
 const factory = @import("factory.zig");
-const input = @import("input.zig");
 const map = @import("map.zig");
 const render = @import("render.zig");
 const storage = @import("storage.zig");
@@ -62,7 +61,7 @@ pub fn deinit() void {
 }
 
 pub fn update(delta: f32) void {
-    input.mouseCaptured = false;
+    zhu.mouse.captured = false;
     applyScene();
 
     if (updateMapFade(delta)) return;

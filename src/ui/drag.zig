@@ -1,7 +1,6 @@
 const zhu = @import("zhu");
 
 const factory = @import("../factory.zig");
-const input = @import("../input.zig");
 const Inventory = @import("../resource/Inventory.zig");
 const item = @import("item.zig");
 const bag = @import("bag.zig");
@@ -31,7 +30,7 @@ pub fn update(inv: *Inventory, canStart: bool) void {
     if (canStart and zhu.key.pressed(.MOUSE_LEFT)) start(inv);
 
     if (state) |*current| {
-        input.mouseCaptured = true;
+        zhu.mouse.captured = true;
         const offset = zhu.mouse.pos.sub(current.start);
         if (offset.length2() >= threshold2) current.moved = true;
 

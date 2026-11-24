@@ -68,7 +68,7 @@ fn readDirection() zhu.Vector2 {
 }
 
 fn targetPosition(world: *const World, player: Entity) ?zhu.Vector2 {
-    if (input.mouseCaptured) return null;
+    if (zhu.mouse.captured) return null;
 
     const playerPos = world.get(player, Position).?;
     const playerTile = map.grid.worldToCell(playerPos);

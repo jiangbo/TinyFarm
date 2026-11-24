@@ -2,7 +2,6 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const factory = @import("../factory.zig");
-const input = @import("../input.zig");
 const item = @import("item.zig");
 const drag = @import("drag.zig");
 const bag = @import("bag.zig");
@@ -64,7 +63,7 @@ fn updateUseItem(inventory: *Inventory, notice: *Notice, bagCaptured: bool) bool
             value.count,
         }),
     }
-    input.mouseCaptured = true;
+    zhu.mouse.captured = true;
     return true;
 }
 

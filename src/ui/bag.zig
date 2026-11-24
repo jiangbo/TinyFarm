@@ -52,13 +52,13 @@ pub fn update(inv: *Inventory) bool {
     if (closed) {
         const captured = drag != null;
         click, drag = .{ .empty, null };
-        if (captured) input.mouseCaptured = true;
+        if (captured) zhu.mouse.captured = true;
         return captured;
     }
     if (updatePanelDrag()) return true;
 
     const clicked = click.update(hovered()) orelse {
-        if (click.captured) input.mouseCaptured = true;
+        if (click.captured) zhu.mouse.captured = true;
         return click.captured;
     };
     const max = zon.pageCount - 1;
@@ -71,7 +71,7 @@ pub fn update(inv: *Inventory) bool {
         .body, .slot => {},
     }
 
-    input.mouseCaptured = true;
+    zhu.mouse.captured = true;
     return true;
 }
 
@@ -135,7 +135,7 @@ pub fn draw(inv: *Inventory, hidden: ?usize) void {
 
 fn updatePanelDrag() bool {
     if (drag) |offset| {
-        input.mouseCaptured = true;
+        zhu.mouse.captured = true;
         if (zhu.key.released(.MOUSE_LEFT)) drag = null else {
             position = zhu.mouse.pos.sub(offset);
         }
@@ -145,7 +145,7 @@ fn updatePanelDrag() bool {
     if (!zhu.key.pressed(.MOUSE_LEFT)) return false;
     if (!std.meta.eql(hovered(), .body)) return false;
 
-    input.mouseCaptured = true;
+    zhu.mouse.captured = true;
     drag = zhu.mouse.pos.sub(position);
     click = .empty;
     return true;

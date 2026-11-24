@@ -65,7 +65,7 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
     const mouse = zhu.mouse.pos.sub(pauseButton.position);
     const button = pauseButton.buttons[0].shape.toRect();
     if (button.contains(mouse) or pauseButton.pressed != null) {
-        input.mouseCaptured = true;
+        zhu.mouse.captured = true;
     }
 
     if (input.released(.pause) or pauseButton.update(.{}) != null) {

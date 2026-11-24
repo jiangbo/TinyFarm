@@ -42,7 +42,7 @@ pub fn update(inv: *Inventory) void {
         inv.activeHotbar = index;
         zhu.sound.play("audio/UI_button08.ogg");
     }
-    if (click.captured) input.mouseCaptured = true;
+    if (click.captured) zhu.mouse.captured = true;
 }
 
 pub fn hover() ?usize {
