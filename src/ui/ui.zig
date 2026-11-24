@@ -2,15 +2,15 @@ const std = @import("std");
 const zhu = @import("zhu");
 const ecs = @import("ecs");
 
-const input = @import("input.zig");
-const inventory = @import("ui/inventory.zig");
-const notice = @import("ui/notice.zig");
-const rest = @import("ui/rest.zig");
-const time = @import("ui/time.zig");
-const pause = @import("ui/pause.zig");
-const save = @import("ui/save.zig");
+const input = @import("../input.zig");
+const inventory = @import("inventory.zig");
+const notice = @import("notice.zig");
+const rest = @import("rest.zig");
+const time = @import("time.zig");
+const pause = @import("pause.zig");
+const save = @import("save.zig");
 
-const titleMenus: []const zhu.widget.Menu = @import("zon/title.zon");
+const titleMenus: []const zhu.widget.Menu = @import("../zon/title.zon");
 
 pub const Message = struct { text: []const u8, fail: bool };
 pub const Request = union(enum) {
@@ -41,14 +41,17 @@ pub fn resetInventory() void {
     inventory.reset();
 }
 
-pub fn openPause() void {
-    pause.open(.play);
-    activePopup = .pause;
-}
-
-pub fn openRest() void {
-    rest.hours = 8;
-    activePopup = .rest;
+pub fn open(next: enum { pause, rest }) void {
+    switch (next) {
+        .pause => {
+            pause.open(.play);
+            activePopup = .pause;
+        },
+        .rest => {
+            rest.hours = 8;
+            activePopup = .rest;
+        },
+    }
 }
 
 pub fn update(world: *ecs.World, delta: f32) ?Request {
@@ -66,7 +69,7 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
     }
 
     if (input.released(.pause) or pauseButton.update(.{}) != null) {
-        openPause();
+        open(.pause);
         return .block;
     }
 

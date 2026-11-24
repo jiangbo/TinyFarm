@@ -11,7 +11,6 @@ pub const life = @import("life.zig");
 pub const light = @import("light.zig");
 pub const movement = @import("movement.zig");
 pub const pickup = @import("pickup.zig");
-pub const rest = @import("rest.zig");
 pub const sort = @import("sort.zig");
 pub const sound = @import("sound.zig");
 pub const time = @import("time.zig");
@@ -36,7 +35,6 @@ pub fn update(world: *ecs.World, delta: f32) void {
     interact.update(world);
     dialog.update(world);
     chest.update(world);
-    rest.update(world);
     animation.update(world, delta);
     farm.update(world);
     sort.update(world);

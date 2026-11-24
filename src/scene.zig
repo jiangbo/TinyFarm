@@ -10,7 +10,7 @@ const render = @import("render.zig");
 const storage = @import("storage.zig");
 const system = @import("system/system.zig");
 const title = @import("title.zig");
-const ui = @import("ui.zig");
+const ui = @import("ui/ui.zig");
 
 const resource = struct {
     const Clock = @import("resource/Clock.zig");
@@ -23,6 +23,7 @@ const resource = struct {
 const World = ecs.World;
 const actor = component.actor;
 const Position = component.Position;
+const Rest = component.map.Rest;
 const Transition = component.map.Transition;
 const Trigger = component.map.Trigger;
 
@@ -132,6 +133,7 @@ fn updatePlay(delta: f32) void {
 
     system.update(&world, delta);
     map.update(&world, delta);
+    if (world.getByIdentity(actor.Interact, Rest) != null) ui.open(.rest);
 }
 
 fn updateMapFade(delta: f32) bool {
