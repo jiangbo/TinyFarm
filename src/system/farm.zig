@@ -241,7 +241,7 @@ test "seedPlant 会种植并扣种子" {
     update(&world);
 
     const index = inv.hotbar[inv.activeHotbar].?;
-    try std.testing.expectEqual(1, inv.store.stacks[index].count);
+    try std.testing.expectEqual(1, inv.store.get(index).?.count);
 
     const cropEntity = map.getTile(target).?.get(.crop).?;
     try std.testing.expectEqual(
@@ -297,7 +297,7 @@ test "seedPlant 无耕地时不扣种子" {
     update(&world);
 
     const index = inv.hotbar[inv.activeHotbar].?;
-    try std.testing.expectEqual(2, inv.store.stacks[index].count);
+    try std.testing.expectEqual(2, inv.store.get(index).?.count);
     try std.testing.expectEqual(null, map.getTile(target).?.get(.crop));
     try std.testing.expectEqual(0, world.getEvent(event.SoundPlay).len);
 }
@@ -326,7 +326,7 @@ test "seedPlant 已有作物时不扣种子" {
     update(&world);
 
     const index = inv.hotbar[inv.activeHotbar].?;
-    try std.testing.expectEqual(2, inv.store.stacks[index].count);
+    try std.testing.expectEqual(2, inv.store.get(index).?.count);
     try std.testing.expectEqual(oldCrop, map.getTile(target).?.get(.crop).?);
     try std.testing.expectEqual(0, world.getEvent(event.SoundPlay).len);
 }

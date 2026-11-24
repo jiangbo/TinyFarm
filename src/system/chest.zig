@@ -122,8 +122,8 @@ test "chest 交互会打开宝箱并移除碰撞" {
     try std.testing.expectEqual(chest, world.getIdentity(Interact).?);
     try std.testing.expect(chestState.opened);
     try std.testing.expectEqual(0, chestState.items.get(.potato));
-    try std.testing.expectEqual(.potato, inv.store.stacks[0].item);
-    try std.testing.expectEqual(2, inv.store.stacks[0].count);
+    try std.testing.expectEqual(.potato, inv.store.get(0).?.item);
+    try std.testing.expectEqual(2, inv.store.get(0).?.count);
     try std.testing.expectEqual(null, world.get(chest, Shape));
     try std.testing.expectEqual(0, animation.index);
 }

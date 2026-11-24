@@ -132,8 +132,8 @@ test "pickup 碰撞后会被销毁并播放音效" {
     update(&world, 0.016);
 
     try std.testing.expectEqual(null, world.get(pickup, Pickup));
-    try std.testing.expectEqual(.potato, inv.store.stacks[0].item);
-    try std.testing.expectEqual(2, inv.store.stacks[0].count);
+    try std.testing.expectEqual(.potato, inv.store.get(0).?.item);
+    try std.testing.expectEqual(2, inv.store.get(0).?.count);
 
     const sounds = world.getEvent(event.SoundPlay);
     try std.testing.expectEqual(1, sounds.len);
@@ -185,7 +185,7 @@ test "背包只有部分空间时 pickup 只减少已拾取数量" {
 
     update(&world, 0.016);
 
-    try std.testing.expectEqual(@as(u32, 99), inv.store.stacks[0].count);
+    try std.testing.expectEqual(@as(u32, 99), inv.store.get(0).?.count);
     try std.testing.expectEqual(@as(u32, 2), world.get(pickup, Pickup).?.count);
     try std.testing.expectEqual(0, world.getEvent(event.SoundPlay).len);
 }

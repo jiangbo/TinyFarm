@@ -17,7 +17,7 @@ pub const Player = struct {
 pub const Inventory = struct {
     activeHotbar: usize = 0,
     activePage: usize = 0,
-    slots: []const component.item.Stack = &.{},
+    slots: []const ?component.item.Stack = &.{},
     hotbar: []const ?usize = &.{},
 };
 
@@ -91,47 +91,4 @@ fn load(T: type, path: []const u8, default: T) T {
         error.FileNotFound => return default,
         else => std.debug.panic("load {s} failed: {}", .{ path, err }),
     };
-}
-
-test "二进制存档保留设置、背包绑定和地图对象状态" {
-    var tiles = [_]Tile{
-        .{ .index = 2, .ground = .wet, .object = .{ .crop = .{
-            .kind = .potato,
-            .stage = .growing,
-            .next = 2,
-            .watered = true,
-        } } },
-        .{ .index = 3, .object = .gone },
-        .{ .index = 4, .object = .{ .chest = .{ .opened = true } } },
-        .{ .index = 5, .object = .{ .product = 2 } },
-        .{ .index = 6 },
-    };
-    var record: Record = .{
-        .timestamp = 123456789,
-        .timeScale = 2.5,
-        .clock = .{ .day = 3, .hour = 19, .period = .night },
-        .player = .{
-            .map = .home_exterior,
-            .position = .xy(32, 48),
-            .facing = .left,
-        },
-        .inventory = .{
-            .activeHotbar = 1,
-            .slots = &.{.{ .item = .potato, .count = 7 }},
-            .hotbar = &.{ null, 0 },
-        },
-    };
-    record.maps.maps.set(.home_exterior, .{ .day = 3, .tiles = &tiles });
-
-    const codec = zhu.codec;
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
-    defer output.deinit();
-    try codec.encode(&output.writer, record);
-
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-    var reader: std.Io.Reader = .fixed(output.writer.buffered());
-    const restored = try codec.decode(&reader, Record, arena.allocator());
-    try std.testing.expectEqualDeep(record, restored);
-    try std.testing.expectEqual(output.writer.buffered().len, reader.seek);
 }

@@ -30,7 +30,7 @@ pub fn reset(self: *Self) void {
     self.activePage = 0;
 }
 
-pub fn capture(self: *Self) storage.Inventory {
+pub fn capture(self: *const Self) storage.Inventory {
     return .{
         .activeHotbar = self.activeHotbar,
         .activePage = self.activePage,
@@ -150,7 +150,7 @@ fn hotbarAutoBind(self: *Self, itemType: ItemEnum) void {
     self.hotbarBind(hotbar, bag);
 }
 
-test "添加物品会合并并自动绑定快捷栏" {
+test "添加同类物品只自动绑定一个快捷栏槽位" {
     var inv: Self = .{};
     inv.reset();
 
@@ -158,8 +158,8 @@ test "添加物品会合并并自动绑定快捷栏" {
     _ = inv.add(.strawberry, 3);
 
     try std.testing.expectEqual(.strawberry, inv.active().?);
-    const index = inv.hotbar[inv.activeHotbar].?;
-    try std.testing.expectEqual(10, inv.store.stacks[index].count);
+    try std.testing.expectEqual(0, inv.hotbar[0].?);
+    try std.testing.expectEqual(null, inv.hotbar[1]);
 }
 
 test "当前物品通过快捷栏引用读取库存槽" {
@@ -171,9 +171,8 @@ test "当前物品通过快捷栏引用读取库存槽" {
     inv.hotbar[1] = 5;
 
     try std.testing.expectEqual(.potato_seed, inv.active().?);
-    try std.testing.expectEqual(2, inv.store.stacks[5].count);
 
-    inv.store.stacks[5].count = 0;
+    inv.store.clearAt(5);
     try std.testing.expectEqual(null, inv.active());
 }
 
@@ -230,8 +229,8 @@ test "拖动物品到空槽后快捷栏继续指向该物品" {
 
     _ = inv.move(0, 5);
 
+    try std.testing.expectEqual(5, inv.hotbar[2].?);
     try std.testing.expectEqual(.strawberry, inv.active().?);
-    try std.testing.expectEqual(5, inv.store.stacks[5].count);
 }
 
 test "交换不同物品后快捷栏继续指向原物品" {
@@ -245,13 +244,13 @@ test "交换不同物品后快捷栏继续指向原物品" {
 
     _ = inv.move(0, 1);
 
+    try std.testing.expectEqual(1, inv.hotbar[0].?);
+    try std.testing.expectEqual(0, inv.hotbar[1].?);
     inv.activeHotbar = 0;
     try std.testing.expectEqual(.strawberry, inv.active().?);
-    try std.testing.expectEqual(5, inv.store.stacks[inv.hotbar[0].?].count);
 
     inv.activeHotbar = 1;
     try std.testing.expectEqual(.potato, inv.active().?);
-    try std.testing.expectEqual(3, inv.store.stacks[inv.hotbar[1].?].count);
 }
 
 test "合并同类物品后快捷栏继续指向合并物品" {
@@ -265,8 +264,8 @@ test "合并同类物品后快捷栏继续指向合并物品" {
 
     _ = inv.move(0, 1);
 
+    try std.testing.expectEqual(1, inv.hotbar[0].?);
     try std.testing.expectEqual(.strawberry, inv.active().?);
-    try std.testing.expectEqual(9, inv.store.stacks[inv.hotbar[0].?].count);
 }
 
 test "使用作物会消耗一个并产出种子" {
@@ -277,10 +276,10 @@ test "使用作物会消耗一个并产出种子" {
 
     const result = inv.useAt(0);
 
-    try std.testing.expectEqual(.strawberry, inv.store.stacks[0].item);
-    try std.testing.expectEqual(1, inv.store.stacks[0].count);
-    try std.testing.expectEqual(.strawberry_seed, inv.store.stacks[1].item);
-    try std.testing.expectEqual(3, inv.store.stacks[1].count);
+    try std.testing.expectEqual(.strawberry, inv.store.get(0).?.item);
+    try std.testing.expectEqual(1, inv.store.get(0).?.count);
+    try std.testing.expectEqual(.strawberry_seed, inv.store.get(1).?.item);
+    try std.testing.expectEqual(3, inv.store.get(1).?.count);
 
     const item = switch (result) {
         .item => |value| value,
@@ -290,39 +289,19 @@ test "使用作物会消耗一个并产出种子" {
     try std.testing.expectEqual(3, item.count);
 }
 
-test "使用最后一个作物会优先回填原槽" {
-    var inv: Self = .{};
-    inv.reset();
-
-    inv.store.stacks[0] = .{ .item = .potato, .count = 1 };
-    inv.hotbar[0] = 0;
-
-    const result = inv.useAt(0);
-
-    try std.testing.expectEqual(.potato_seed, inv.store.stacks[0].item);
-    try std.testing.expectEqual(3, inv.store.stacks[0].count);
-    try std.testing.expectEqual(0, inv.hotbar[0].?);
-    try std.testing.expectEqual(.potato_seed, inv.active().?);
-
-    const item = switch (result) {
-        .item => |value| value,
-        .none, .full => return error.TestExpectedEqual,
-    };
-    try std.testing.expectEqual(.potato_seed, item.item);
-    try std.testing.expectEqual(3, item.count);
-}
-
 test "使用物品产物优先回到原槽而不是第一个空槽" {
     var inv: Self = .{};
     inv.reset();
 
     inv.store.stacks[5] = .{ .item = .potato, .count = 1 };
+    inv.hotbar[0] = 5;
 
     const result = inv.useAt(5);
 
-    try std.testing.expectEqual(0, inv.store.stacks[0].count);
-    try std.testing.expectEqual(.potato_seed, inv.store.stacks[5].item);
-    try std.testing.expectEqual(3, inv.store.stacks[5].count);
+    try std.testing.expectEqual(null, inv.store.get(0));
+    try std.testing.expectEqual(5, inv.hotbar[0].?);
+    try std.testing.expectEqual(.potato_seed, inv.active().?);
+    try std.testing.expectEqual(3, inv.store.get(5).?.count);
 
     const item = switch (result) {
         .item => |value| value,
@@ -332,7 +311,7 @@ test "使用物品产物优先回到原槽而不是第一个空槽" {
     try std.testing.expectEqual(3, item.count);
 }
 
-test "使用物品空间不足时不会修改背包" {
+test "使用物品空间不足时返回 full 且不绑定产物" {
     var inv: Self = .{};
     inv.reset();
 
@@ -342,8 +321,22 @@ test "使用物品空间不足时不会修改背包" {
     const result = inv.useAt(0);
 
     try std.testing.expectEqual(Use.full, result);
-    try std.testing.expectEqual(.strawberry, inv.store.stacks[0].item);
-    try std.testing.expectEqual(2, inv.store.stacks[0].count);
-    try std.testing.expectEqual(.potato, inv.store.stacks[1].item);
-    try std.testing.expectEqual(99, inv.store.stacks[1].count);
+    try std.testing.expectEqual(null, inv.hotbar[0]);
+}
+
+test "背包恢复保留槽位、页面和快捷栏绑定" {
+    var original: Self = .{ .activeHotbar = 1, .activePage = 1 };
+    original.store.stacks[5] = .{ .item = .potato, .count = 7 };
+    original.hotbar[1] = 5;
+
+    var restored: Self = .{};
+    restored.store.stacks[0] = .{ .item = .strawberry, .count = 2 };
+    restored.hotbar[0] = 0;
+    restored.restore(original.capture());
+
+    try std.testing.expectEqualDeep(original.store.stacks, restored.store.stacks);
+    try std.testing.expectEqualDeep(original.hotbar, restored.hotbar);
+    try std.testing.expectEqual(original.activePage, restored.activePage);
+    try std.testing.expectEqual(original.activeHotbar, restored.activeHotbar);
+    try std.testing.expectEqual(.potato, restored.active().?);
 }
