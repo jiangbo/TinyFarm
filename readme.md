@@ -89,6 +89,7 @@ zig build -Dtarget=wasm32-emscripten
 | --- | --- |
 | WASD / 方向键 | 移动 |
 | F | 交互 |
+| L | 开关随身灯（室内或夜间可亮） |
 | I | 物品栏 |
 | Tab | 切换快捷栏 |
 | 1–9、0 | 选择快捷栏槽位 |

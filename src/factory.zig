@@ -56,23 +56,31 @@ pub const Item = struct {
 };
 
 pub const CropStage = struct { sprite: Sprite, duration: f32 };
-// 单种作物的所有生长阶段配置
-pub const CropConfig = struct { stages: [4]CropStage };
+const StageFields = zhu.enums.FieldStruct(farm.GrowthEnum, CropStage);
+const CropStages = std.EnumArray(farm.GrowthEnum, CropStage);
 
 pub const Config = struct {
     player: Actor,
     playerLight: light.Point,
-    items: [@typeInfo(item.ItemEnum).@"enum".field_names.len]Item,
-    animals: [@typeInfo(actor.AnimalEnum).@"enum".field_names.len]Character,
+    items: zhu.enums.FieldStruct(item.ItemEnum, Item),
+    animals: zhu.enums.FieldStruct(actor.AnimalEnum, Character),
     friend: Character,
-    // crops 按 farm.CropEnum 枚举下标索引，每种作物对应一组阶段配置
-    crops: [@typeInfo(farm.CropEnum).@"enum".field_names.len]CropConfig,
+    crops: zhu.enums.FieldStruct(farm.CropEnum, StageFields),
 };
 
-pub const zon: Config = @import("zon/factory.zon");
+const zon: Config = @import("zon/factory.zon");
+const items: std.EnumArray(item.ItemEnum, Item) = .init(zon.items);
+const animals: std.EnumArray(actor.AnimalEnum, Character) = .init(zon.animals);
+const crops = blk: {
+    var table: std.EnumArray(farm.CropEnum, CropStages) = .initUndefined();
+    for (std.enums.values(farm.CropEnum)) |kind| {
+        table.set(kind, .init(@field(zon.crops, @tagName(kind))));
+    }
+    break :blk table;
+};
 
 pub fn itemConfig(itemType: item.ItemEnum) Item {
-    return zon.items[@backingInt(itemType)];
+    return items.get(itemType);
 }
 
 // 从 CropEnum 得到对应的种子 ItemEnum
@@ -92,7 +100,7 @@ pub fn harvestItem(kind: farm.CropEnum) item.ItemEnum {
 }
 
 pub fn cropStage(kind: farm.CropEnum, stage: farm.GrowthEnum) CropStage {
-    return zon.crops[@backingInt(kind)].stages[@backingInt(stage)];
+    return crops.get(kind).get(stage);
 }
 
 pub fn resolveImage(sprite: Sprite) zhu.graphics.Image {
@@ -139,10 +147,10 @@ pub fn spawnPlayer(world: *World, spawn: zhu.Vector2, facing: actor.Facing) void
 }
 
 pub fn spawnAnimal(world: *World, kind: actor.Animal) Entity {
-    const config = zon.animals[@backingInt(kind)];
+    const config = animals.get(kind);
 
     const entity = switch (kind) {
-        inline else => |tag| spawnNpc(world, zon.animals[@backingInt(tag)]),
+        inline else => |tag| spawnNpc(world, comptime animals.get(tag)),
     };
     world.add(entity, kind);
     const interval = actor.Life.eatInterval;
@@ -395,7 +403,7 @@ pub fn spawnCrop(
     position: zhu.Vector2,
     kind: farm.CropEnum,
 ) Entity {
-    const stage = zon.crops[@backingInt(kind)].stages[0];
+    const stage = cropStage(kind, .seed);
     const entity = world.createEntity();
     world.add(entity, farm.Crop{ .kind = kind, .next = stage.duration });
     world.add(entity, component.Position.xy(position.x, position.y));
@@ -513,19 +521,26 @@ test "spawnCrop 会按作物类型设置 kind 和 next" {
     const cases = [_]struct {
         kind: farm.CropEnum,
         position: zhu.Vector2,
+        duration: f32,
     }{
-        .{ .kind = .strawberry, .position = .xy(32, 48) },
-        .{ .kind = .potato, .position = .xy(64, 80) },
+        .{
+            .kind = .strawberry,
+            .position = .xy(32, 48),
+            .duration = zon.crops.strawberry.seed.duration,
+        },
+        .{
+            .kind = .potato,
+            .position = .xy(64, 80),
+            .duration = zon.crops.potato.seed.duration,
+        },
     };
 
     for (cases) |case| {
         const entity = spawnCrop(&world, case.position, case.kind);
         const crop = world.get(entity, farm.Crop).?;
-        const config = zon.crops[@backingInt(case.kind)];
-
         try expectEqual(farm.GrowthEnum.seed, crop.stage);
         try expectEqual(case.kind, crop.kind);
-        try expectEqual(config.stages[0].duration, crop.next);
+        try expectEqual(case.duration, crop.next);
         const position = world.get(entity, component.Position).?;
         try expectEqual(case.position.x, position.x);
     }

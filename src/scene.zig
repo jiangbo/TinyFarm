@@ -251,10 +251,12 @@ fn capture() storage.Record {
 
 fn restore(record: storage.Record) void {
     const clock = world.getResourcePtr(resource.Clock).?;
+    const settings = world.getResourcePtr(resource.Settings).?;
 
     clock.* = record.clock;
     world.getResourcePtr(resource.Notice).?.reset();
-    world.getResourcePtr(resource.Settings).?.timeScale = record.timeScale;
+    settings.timeScale = record.timeScale;
+    settings.lightOn = false;
 
     map.unload(allocator);
     map.restore(allocator, record.maps, clock.day);

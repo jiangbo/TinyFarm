@@ -138,7 +138,7 @@
         },
     },
     .items = .{
-        .{ // hoe (index 0)
+        .hoe = .{
             .name = "锄头",
             .category = "工具",
             .description = "翻开土地，准备播种。",
@@ -150,7 +150,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // water (index 1)
+        .water = .{
             .name = "水壶",
             .category = "工具",
             .description = "给作物浇水。",
@@ -162,7 +162,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // pickaxe (index 2)
+        .pickaxe = .{
             .name = "镐子",
             .category = "工具",
             .description = "敲碎石块和矿物。",
@@ -175,7 +175,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // axe (index 3)
+        .axe = .{
             .name = "斧头",
             .category = "工具",
             .description = "砍伐树木。",
@@ -188,7 +188,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // sickle (index 4)
+        .sickle = .{
             .name = "镰刀",
             .category = "工具",
             .description = "收割成熟作物。",
@@ -200,7 +200,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // strawberry_seed (index 5)，对应 CropEnum.strawberry
+        .strawberry_seed = .{
             .name = "草莓种子",
             .category = "种子",
             .description = "种下后会长出草莓。",
@@ -212,7 +212,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // potato_seed (index 6)，对应 CropEnum.potato
+        .potato_seed = .{
             .name = "土豆种子",
             .category = "种子",
             .description = "种下后会长出土豆。",
@@ -224,7 +224,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // strawberry (index 7)，收获产出
+        .strawberry = .{
             .name = "草莓",
             .category = "作物",
             .description = "成熟后收获的水果。",
@@ -237,7 +237,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // potato (index 8)，收获产出
+        .potato = .{
             .name = "土豆",
             .category = "作物",
             .description = "成熟后收获的根茎作物。",
@@ -250,7 +250,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // timber (index 9)，资源产出
+        .timber = .{
             .name = "木材",
             .category = "材料",
             .description = "砍伐树木得到的基础材料。",
@@ -267,7 +267,7 @@
                 .size = .{ .x = 32, .y = 32 },
             },
         },
-        .{ // stone (index 10)，资源产出
+        .stone = .{
             .name = "石头",
             .category = "材料",
             .description = "敲碎石块得到的基础材料。",
@@ -286,7 +286,7 @@
         },
     },
     .animals = .{
-        .{ // cow
+        .cow = .{
             .speed = 10.0,
             .wanderRadius = 32.0,
             .soundId = .cow,
@@ -352,7 +352,7 @@
                 },
             },
         },
-        .{ // sheep
+        .sheep = .{
             .speed = 10.0,
             .wanderRadius = 32.0,
             .soundId = .sheep,
@@ -497,110 +497,106 @@
         },
     },
     .crops = .{
-        .{ // index 0: strawberry，对应 farm.CropEnum.strawberry
+        .strawberry = .{
             // .path = "farm-rpg/Farm Crops/Spring Crops.png"
-            .stages = .{
-                .{
-                    .sprite = .{
-                        .imageId = 4041761859,
-                        .rect = .{
-                            .min = .{ .x = 0, .y = 16 },
-                            .size = .{ .x = 16, .y = 16 },
-                        },
-                        .offset = .{ .x = 2.5, .y = -2.5 },
+            .seed = .{
+                .sprite = .{
+                    .imageId = 4041761859,
+                    .rect = .{
+                        .min = .{ .x = 0, .y = 16 },
                         .size = .{ .x = 16, .y = 16 },
                     },
-                    .duration = 5.0,
+                    .offset = .{ .x = 2.5, .y = -2.5 },
+                    .size = .{ .x = 16, .y = 16 },
                 },
-                .{
-                    .sprite = .{
-                        .imageId = 4041761859,
-                        .rect = .{
-                            .min = .{ .x = 16, .y = 16 },
-                            .size = .{ .x = 16, .y = 16 },
-                        },
-                        .offset = .{ .x = 1.0, .y = -4.0 },
+                .duration = 5.0,
+            },
+            .sprout = .{
+                .sprite = .{
+                    .imageId = 4041761859,
+                    .rect = .{
+                        .min = .{ .x = 16, .y = 16 },
                         .size = .{ .x = 16, .y = 16 },
                     },
-                    .duration = 8.0,
+                    .offset = .{ .x = 1.0, .y = -4.0 },
+                    .size = .{ .x = 16, .y = 16 },
                 },
-                .{
-                    .sprite = .{
-                        .imageId = 4041761859,
-                        .rect = .{
-                            .min = .{ .x = 32, .y = 16 },
-                            .size = .{ .x = 16, .y = 16 },
-                        },
-                        .offset = .{ .x = 0.5, .y = -3.0 },
+                .duration = 8.0,
+            },
+            .growing = .{
+                .sprite = .{
+                    .imageId = 4041761859,
+                    .rect = .{
+                        .min = .{ .x = 32, .y = 16 },
                         .size = .{ .x = 16, .y = 16 },
                     },
-                    .duration = 8.0,
+                    .offset = .{ .x = 0.5, .y = -3.0 },
+                    .size = .{ .x = 16, .y = 16 },
                 },
-                .{
-                    .sprite = .{
-                        .imageId = 4041761859,
-                        .rect = .{
-                            .min = .{ .x = 80, .y = 16 },
-                            .size = .{ .x = 16, .y = 16 },
-                        },
-                        .offset = .{ .x = 0.5, .y = -0.5 },
+                .duration = 8.0,
+            },
+            .mature = .{
+                .sprite = .{
+                    .imageId = 4041761859,
+                    .rect = .{
+                        .min = .{ .x = 80, .y = 16 },
                         .size = .{ .x = 16, .y = 16 },
                     },
-                    .duration = 0.0,
+                    .offset = .{ .x = 0.5, .y = -0.5 },
+                    .size = .{ .x = 16, .y = 16 },
                 },
+                .duration = 0.0,
             },
         },
-        .{ // index 1: potato，对应 farm.CropEnum.potato
+        .potato = .{
             // .path = "farm-rpg/Farm Crops/Spring/Spring Crops.png"
-            .stages = .{
-                .{
-                    .sprite = .{
-                        .imageId = 4041761859,
-                        .rect = .{
-                            .min = .{ .x = 0, .y = 80 },
-                            .size = .{ .x = 16, .y = 16 },
-                        },
-                        .offset = .{ .x = 2.5, .y = -2.5 },
+            .seed = .{
+                .sprite = .{
+                    .imageId = 4041761859,
+                    .rect = .{
+                        .min = .{ .x = 0, .y = 80 },
                         .size = .{ .x = 16, .y = 16 },
                     },
-                    .duration = 4.0,
+                    .offset = .{ .x = 2.5, .y = -2.5 },
+                    .size = .{ .x = 16, .y = 16 },
                 },
-                .{
-                    .sprite = .{
-                        .imageId = 4041761859,
-                        .rect = .{
-                            .min = .{ .x = 32, .y = 80 },
-                            .size = .{ .x = 16, .y = 16 },
-                        },
-                        .offset = .{ .x = 1.0, .y = -4.0 },
+                .duration = 4.0,
+            },
+            .sprout = .{
+                .sprite = .{
+                    .imageId = 4041761859,
+                    .rect = .{
+                        .min = .{ .x = 32, .y = 80 },
                         .size = .{ .x = 16, .y = 16 },
                     },
-                    .duration = 6.0,
+                    .offset = .{ .x = 1.0, .y = -4.0 },
+                    .size = .{ .x = 16, .y = 16 },
                 },
-                .{
-                    .sprite = .{
-                        .imageId = 4041761859,
-                        .rect = .{
-                            .min = .{ .x = 48, .y = 80 },
-                            .size = .{ .x = 16, .y = 16 },
-                        },
-                        .offset = .{ .x = 0.5, .y = -3.0 },
+                .duration = 6.0,
+            },
+            .growing = .{
+                .sprite = .{
+                    .imageId = 4041761859,
+                    .rect = .{
+                        .min = .{ .x = 48, .y = 80 },
                         .size = .{ .x = 16, .y = 16 },
                     },
-                    .duration = 6.0,
+                    .offset = .{ .x = 0.5, .y = -3.0 },
+                    .size = .{ .x = 16, .y = 16 },
                 },
-                .{
-                    .sprite = .{
-                        .imageId = 4041761859,
-                        .rect = .{
-                            .min = .{ .x = 80, .y = 80 },
-                            .size = .{ .x = 16, .y = 16 },
-                        },
-                        .offset = .{ .x = 0.5, .y = -0.5 },
+                .duration = 6.0,
+            },
+            .mature = .{
+                .sprite = .{
+                    .imageId = 4041761859,
+                    .rect = .{
+                        .min = .{ .x = 80, .y = 80 },
                         .size = .{ .x = 16, .y = 16 },
                     },
-                    .duration = 0.0,
+                    .offset = .{ .x = 0.5, .y = -0.5 },
+                    .size = .{ .x = 16, .y = 16 },
                 },
+                .duration = 0.0,
             },
         },
     },
