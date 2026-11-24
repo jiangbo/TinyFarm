@@ -1,26 +1,6 @@
-const std = @import("std");
 const zhu = @import("zhu");
 
-pub const Action = enum {
-    left,
-    right,
-    up,
-    down,
-    pause,
-    interact,
-    inventory,
-    hotbar,
-    hotbar1,
-    hotbar2,
-    hotbar3,
-    hotbar4,
-    hotbar5,
-    hotbar6,
-    hotbar7,
-    hotbar8,
-    hotbar9,
-    hotbar10,
-};
+pub const Action = zhu.enums.fromField(@import("zon/input.zon"), "type");
 
 const Entry = struct { type: Action, value: []const zhu.key.Code };
 const zon: []const Entry = @import("zon/input.zon");
@@ -41,11 +21,11 @@ pub fn released(action: Action) bool {
 }
 
 pub fn hotbarPressed() ?u8 {
-    const first: usize = @backingInt(Action.hotbar1);
-    const last: usize = @backingInt(Action.hotbar10);
-    for (first..last + 1) |value| {
-        const action: Action = @fromBackingInt(@intCast(value));
-        if (pressed(action)) return @intCast(value - first);
+    for ([_]Action{
+        .hotbar1, .hotbar2, .hotbar3, .hotbar4, .hotbar5,
+        .hotbar6, .hotbar7, .hotbar8, .hotbar9, .hotbar10,
+    }, 0..) |action, index| {
+        if (pressed(action)) return @intCast(index);
     }
     return null;
 }

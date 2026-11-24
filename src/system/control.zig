@@ -5,6 +5,7 @@ const ecs = @import("ecs");
 const component = @import("../component.zig");
 const input = @import("../input.zig");
 const Inventory = @import("../resource/Inventory.zig");
+const Settings = @import("../resource/Settings.zig");
 const map = @import("../map.zig");
 
 const Actor = component.actor.Actor;
@@ -25,6 +26,11 @@ const tileRange: i32 = 1;
 
 pub fn update(world: *World) void {
     const player = world.getIdentity(Player).?;
+
+    if (input.pressed(.light)) {
+        const settings = world.getResourcePtr(Settings).?;
+        settings.lightOn = !settings.lightOn;
+    }
 
     // 工具动作播放期间不接收新的移动和工具输入。
     if (world.has(player, Busy)) return;
@@ -251,4 +257,30 @@ test "点击目标只写入使用意图" {
     try std.testing.expect(want.target.approxEqual(testTarget));
     const velocity = world.get(player, Velocity).?;
     try std.testing.expect(velocity.value.approxEqual(.zero));
+}
+
+test "按 L 切换随身灯，长按不重复切换且工具动作不阻止开关" {
+    zhu.window.resetInput();
+    defer zhu.window.resetInput();
+
+    var world = World.init(std.testing.allocator);
+    defer world.deinit();
+    world.addResource(Settings{});
+    const player = addTestPlayer(&world, .xy(24, 40));
+    world.add(player, Busy{});
+    const settings = world.getResourcePtr(Settings).?;
+
+    zhu.key.set(.L, true);
+    update(&world);
+    try std.testing.expect(settings.lightOn);
+
+    zhu.window.endInput();
+    update(&world);
+    try std.testing.expect(settings.lightOn);
+
+    zhu.key.set(.L, false);
+    zhu.window.endInput();
+    zhu.key.set(.L, true);
+    update(&world);
+    try std.testing.expect(!settings.lightOn);
 }

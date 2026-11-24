@@ -21,10 +21,10 @@ pub const wander = @import("wander.zig");
 pub fn update(world: *ecs.World, delta: f32) void {
     // 时间先推进，地图跨天逻辑和灯光都依赖本帧最新时间事件。
     time.update(world, delta);
-    light.update(world);
 
     // 控制系统先写入意图，移动系统统一结算位置和碰撞。
     control.update(world);
+    light.update(world);
     life.update(world, delta);
     wander.update(world, delta);
     movement.update(world, delta);
