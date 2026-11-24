@@ -4,13 +4,13 @@ const ecs = @import("ecs");
 
 const component = @import("../component.zig");
 const Clock = @import("../resource/Clock.zig");
-const Speed = @import("../resource/Speed.zig");
+const Settings = @import("../resource/Settings.zig");
 
 const event = component.event;
 
 pub fn update(world: *ecs.World, delta: f32) void {
     const clock = world.getResourcePtr(Clock).?;
-    const speed = world.getResourcePtr(Speed).?.*;
+    const timeScale = world.getResourcePtr(Settings).?.timeScale;
 
     world.clearEvent(event.HourChanged);
     world.clearEvent(event.DayChanged);
@@ -22,7 +22,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
     }
     world.clearEvent(event.Rest);
 
-    clock.minute += delta * speed.value * 10.0;
+    clock.minute += delta * timeScale * 10.0;
     while (clock.minute >= 60.0) {
         clock.minute -= 60.0;
         advanceOneHour(world, clock);
@@ -64,13 +64,13 @@ fn currentPeriod(hour: u8) component.time.Period {
     };
 }
 
-test "时间推进到整点会发出小时事件" {
+test "按存档倍率推进到整点会发出小时事件" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
     world.addResource(Clock{ .hour = 6, .minute = 59.0 });
-    world.addResource(Speed{});
+    world.addResource(Settings{ .timeScale = 2 });
     const clock = world.getResourcePtr(Clock).?;
-    update(&world, 0.2);
+    update(&world, 0.1);
 
     try std.testing.expectEqual(7, clock.hour);
     try std.testing.expectEqual(1.0, clock.minute);
@@ -87,7 +87,7 @@ test "时间推进跨天会发出新一天事件" {
         .minute = 59.0,
         .period = .night,
     });
-    world.addResource(Speed{});
+    world.addResource(Settings{});
     const clock = world.getResourcePtr(Clock).?;
     update(&world, 0.2);
 
@@ -111,7 +111,7 @@ test "按小时推进会清零分钟并逐小时发事件" {
         .minute = 37.0,
         .period = .night,
     });
-    world.addResource(Speed{});
+    world.addResource(Settings{});
     const clock = world.getResourcePtr(Clock).?;
     world.addEvent(event.Rest{ .hours = 3 });
     update(&world, 0);
@@ -136,7 +136,7 @@ test "时段跨过边界会发出时段事件" {
         .minute = 59.0,
         .period = .dawn,
     });
-    world.addResource(Speed{});
+    world.addResource(Settings{});
     const clock = world.getResourcePtr(Clock).?;
     update(&world, 0.2);
 

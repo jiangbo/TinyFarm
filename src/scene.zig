@@ -16,7 +16,7 @@ const resource = struct {
     const Clock = @import("resource/Clock.zig");
     const Inventory = @import("resource/Inventory.zig");
     const Notice = @import("resource/Notice.zig");
-    const Speed = @import("resource/Speed.zig");
+    const Settings = @import("resource/Settings.zig");
 };
 
 const World = ecs.World;
@@ -32,7 +32,6 @@ var allocator: zhu.Allocator = undefined;
 var mapFade: zhu.widget.Fade = .init(0.15);
 var current: Scene = .title;
 var pending: ?Scene = null;
-var config: storage.Config = .{};
 
 pub fn init(allocator_: zhu.Allocator) void {
     allocator = allocator_;
@@ -41,11 +40,11 @@ pub fn init(allocator_: zhu.Allocator) void {
     world.addResource(resource.Clock{});
     world.addResource(resource.Inventory{});
     world.addResource(resource.Notice{});
-    world.addResource(resource.Speed{});
+    world.addResource(resource.Settings.load());
 
     // 存档状态先就位，UI 只持有这份长期有效的槽位切片。
-    config = storage.init(&world);
-    ui.init(.{ .slots = &storage.slots, .config = &config });
+    storage.init();
+    ui.init(&storage.slots);
     title.init();
     map.init();
     render.init();
@@ -60,15 +59,13 @@ pub fn deinit() void {
 }
 
 pub fn update(delta: f32) void {
-    storage.update(&world, config);
-
     input.mouseCaptured = false;
     applyScene();
 
     if (updateMapFade(delta)) return;
 
     switch (current) {
-        .title => if (title.update(delta)) |req| {
+        .title => if (title.update(&world, delta)) |req| {
             switch (req) {
                 .start => pending = .{ .play = null },
                 .load => |slot| pending = .{ .play = slot },
@@ -84,7 +81,7 @@ pub fn draw() void {
     switch (current) {
         .title => {
             zhu.batch.beginDraw(.rgb(59, 79, 69), .{});
-            title.draw();
+            title.draw(&world);
         },
         .play => {
             render.draw(&world);
@@ -172,7 +169,7 @@ fn applyScene() void {
 
 fn enterScene(next: Scene) void {
     switch (next) {
-        .title => title.enter(),
+        .title => title.enter(&world),
         .play => |slot| enterPlay(slot),
     }
 }
@@ -185,7 +182,7 @@ fn enterPlay(loadSlot: ?u8) void {
     if (loadSlot) |slot| {
         if (!load(slot)) {
             current = .title;
-            title.enter();
+            title.enter(&world);
             return;
         }
         zhu.music.play("audio/01_spring_journey.ogg");
@@ -195,6 +192,7 @@ fn enterPlay(loadSlot: ?u8) void {
     // 新游戏从固定初始地图和基础工具开始。
     clock.reset();
     world.getResourcePtr(resource.Notice).?.reset();
+    world.getResourcePtr(resource.Settings).?.lightOn = false;
     map.resetState();
 
     resetWorld();
@@ -245,6 +243,7 @@ fn capture() storage.Record {
         .player = capturePlayer(),
         .inventory = inv.capture(),
         .maps = map.capture(allocator, &world),
+        .timeScale = world.getResourcePtr(resource.Settings).?.timeScale,
     };
 }
 
@@ -253,6 +252,7 @@ fn restore(record: storage.Record) void {
 
     clock.* = record.clock;
     world.getResourcePtr(resource.Notice).?.reset();
+    world.getResourcePtr(resource.Settings).?.timeScale = record.timeScale;
 
     map.unload(allocator);
     map.restore(allocator, record.maps, clock.day);

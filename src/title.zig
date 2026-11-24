@@ -1,9 +1,11 @@
 const std = @import("std");
 const zhu = @import("zhu");
+const ecs = @import("ecs");
 
 const input = @import("input.zig");
 const pause = @import("ui/pause.zig");
 const save = @import("ui/save.zig");
+const Settings = @import("resource/Settings.zig");
 
 const menus: []const zhu.widget.Menu = @import("zon/title.zon");
 
@@ -26,7 +28,8 @@ pub fn init() void {
     pauseButton.position = .xy(zhu.camera.size.x - 10 - size.x, 10);
 }
 
-pub fn enter() void {
+pub fn enter(world: *ecs.World) void {
+    world.getResourcePtr(Settings).?.timeScale = 1;
     zhu.camera.main = .window;
     zhu.music.play("audio/02_spring_fairy_tale.ogg");
     elapsed = 0;
@@ -37,10 +40,10 @@ pub fn exit() void {
     zhu.music.stop(0);
 }
 
-pub fn update(delta: f32) ?Request {
+pub fn update(world: *ecs.World, delta: f32) ?Request {
     elapsed += delta;
 
-    if (popup) |active| return updatePopup(active);
+    if (popup) |active| return updatePopup(world, active);
 
     const pauseKey = input.released(.pause);
     if (pauseKey or pauseButton.update(.{}) != null) {
@@ -62,10 +65,10 @@ pub fn update(delta: f32) ?Request {
     return null;
 }
 
-fn updatePopup(active: Popup) ?Request {
+fn updatePopup(world: *ecs.World, active: Popup) ?Request {
     switch (active) {
         .pause => {
-            if (pause.update()) |req| switch (req) {
+            if (pause.update(world)) |req| switch (req) {
                 .close => popup = null,
                 .save, .load => unreachable,
                 .title => unreachable,
@@ -82,7 +85,7 @@ fn updatePopup(active: Popup) ?Request {
     return null;
 }
 
-pub fn draw() void {
+pub fn draw(world: *const ecs.World) void {
     zhu.batch.drawImage(background, .zero, .{
         .size = zhu.camera.size,
     });
@@ -95,7 +98,7 @@ pub fn draw() void {
     mainMenu.draw();
     pauseButton.draw();
     switch (popup orelse return) {
-        .pause => pause.draw(),
+        .pause => pause.draw(world),
         .save => save.draw(),
     }
 }

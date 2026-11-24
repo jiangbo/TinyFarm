@@ -1,21 +1,12 @@
 const std = @import("std");
 const zhu = @import("zhu");
-const ecs = @import("ecs");
 
 const component = @import("component.zig");
 const Clock = @import("resource/Clock.zig");
-const Speed = @import("resource/Speed.zig");
-const World = ecs.World;
 
 pub const Summary = struct { day: u32 = 0, timestamp: i64 = 0 };
 
 pub const Slot = union(enum) { empty, valid: Summary };
-
-pub const Config = struct {
-    speed: f32 = 1,
-    music: f32 = 1,
-    sound: f32 = 1,
-};
 
 pub const Player = struct {
     map: component.map.Id = .town,
@@ -64,39 +55,19 @@ pub const Record = struct {
     player: Player = .{},
     inventory: Inventory = .{},
     maps: MapRecord = .{},
+    timeScale: f32 = 1,
 };
 
-var config: Config = .{};
 pub var slots: [10]Slot = @splat(.empty);
 
-pub fn init(world: *const World) Config {
-    config = load(Config, "config.bin", .{});
+pub fn init() void {
     slots = load(@TypeOf(slots), "saves/slots.bin", @splat(.empty));
-    sync(world, config);
-    return config;
-}
-
-pub fn update(world: *const World, cfg: Config) void {
-    if (std.meta.eql(config, cfg)) return;
-
-    sync(world, cfg);
-    zhu.storage.writeValue("config.bin", cfg) catch |err| {
-        std.log.err("save config failed: {}", .{err});
-        return;
-    };
-    config = cfg;
-}
-
-fn sync(world: *const World, cfg: Config) void {
-    world.getResourcePtr(Speed).?.value = cfg.speed;
-    zhu.music.setVolume(cfg.music);
-    zhu.sound.setVolume(cfg.sound);
 }
 
 pub fn read(slot: u8) !zhu.storage.Loaded(Record) {
     var buffer: [32]u8 = undefined;
     const path = zhu.formatZ(&buffer, "saves/slot{d}.bin", .{slot});
-    const record = try zhu.storage.readValue(Record, path);
+    const record = try zhu.storage.readArena(Record, path);
     std.log.info("game loaded: {s}", .{path});
     return record;
 }
@@ -116,16 +87,13 @@ pub fn write(slot: u8, record: Record) !void {
 }
 
 fn load(T: type, path: []const u8, default: T) T {
-    var loaded = zhu.storage.readValue(T, path) catch |err| switch (err) {
+    return zhu.storage.readValue(T, path) catch |err| switch (err) {
         error.FileNotFound => return default,
         else => std.debug.panic("load {s} failed: {}", .{ path, err }),
     };
-    defer loaded.deinit();
-
-    return loaded.value;
 }
 
-test "二进制存档保留背包绑定和地图对象状态" {
+test "二进制存档保留设置、背包绑定和地图对象状态" {
     var tiles = [_]Tile{
         .{ .index = 2, .ground = .wet, .object = .{ .crop = .{
             .kind = .potato,
@@ -140,6 +108,7 @@ test "二进制存档保留背包绑定和地图对象状态" {
     };
     var record: Record = .{
         .timestamp = 123456789,
+        .timeScale = 2.5,
         .clock = .{ .day = 3, .hour = 19, .period = .night },
         .player = .{
             .map = .home_exterior,

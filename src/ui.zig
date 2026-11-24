@@ -10,7 +10,6 @@ const time = @import("ui/time.zig");
 const pause = @import("ui/pause.zig");
 const save = @import("ui/save.zig");
 
-const Config = @import("storage.zig").Config;
 const titleMenus: []const zhu.widget.Menu = @import("zon/title.zon");
 
 pub const Message = struct { text: []const u8, fail: bool };
@@ -26,17 +25,11 @@ var pauseButton: zhu.widget.Menu = titleMenus[1];
 var activePopup: ?Popup = null;
 var popupMessage: ?Message = null;
 
-pub const Init = struct {
-    slots: []const save.Slot,
-    config: *Config,
-};
-
-pub fn init(args: Init) void {
+pub fn init(slots: []const save.Slot) void {
     inventory.reset();
     notice.init();
     time.init();
-    pause.cfg = args.config;
-    save.init(args.slots);
+    save.init(slots);
     rest.init();
     const size = pauseButton.buttons[0].shape.toRect().size;
     pauseButton.position = .xy(zhu.camera.size.x - 10 - size.x, 10);
@@ -99,7 +92,7 @@ fn updatePopup(world: *ecs.World, active: Popup) ?Request {
             }
         },
         .rest => if (rest.update(world)) close(),
-        .pause => if (pause.update()) |req| switch (req) {
+        .pause => if (pause.update(world)) |req| switch (req) {
             .close => close(),
             .save => {
                 popupMessage = null;
@@ -135,7 +128,7 @@ pub fn draw(world: *const ecs.World) void {
         switch (active) {
             .save => save.draw(),
             .rest => rest.draw(),
-            .pause => pause.draw(),
+            .pause => pause.draw(world),
         }
     }
 
