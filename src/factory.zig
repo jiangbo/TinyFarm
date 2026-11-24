@@ -136,7 +136,6 @@ pub fn spawnPlayer(world: *World, spawn: zhu.Vector2, facing: actor.Facing) void
     world.add(player, render.YSort{});
     world.add(player, ui.Target{});
     world.add(player, zon.playerLight);
-    world.add(player, light.Disabled{});
 }
 
 pub fn spawnAnimal(world: *World, kind: actor.Animal) Entity {
@@ -384,7 +383,7 @@ fn spotDirection(spot: zhu.extend.tiled.ClassProperty) zhu.Vector2 {
 fn applyLight(world: *World, entity: Entity, object: Object) void {
     const day = object.getProperty("day_only", bool) orelse false;
     const night = object.getProperty("night_only", bool) orelse !day;
-    world.addMany(entity, .{ light.Disabled{}, light.Pending{} });
+    world.add(entity, light.Pending{});
 
     if (day) world.add(entity, light.Day{});
 

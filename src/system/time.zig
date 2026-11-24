@@ -12,7 +12,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
     const clock = world.getResourcePtr(Clock).?;
     const timeScale = world.getResourcePtr(Settings).?.timeScale;
 
-    world.clearEvent(event.HourChanged);
+    world.clearEvent(event.DarkChanged);
     world.clearEvent(event.DayChanged);
     world.clearEvent(event.PeriodChanged);
 
@@ -30,6 +30,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
 }
 
 fn advanceOneHour(world: *ecs.World, clock: *Clock) void {
+    const dark = clock.isDark();
     clock.hour += 1;
 
     if (clock.hour >= 24) {
@@ -38,7 +39,7 @@ fn advanceOneHour(world: *ecs.World, clock: *Clock) void {
         world.addEvent(event.DayChanged{ .day = clock.day });
     }
 
-    world.addEvent(event.HourChanged{});
+    if (dark != clock.isDark()) world.addEvent(event.DarkChanged{});
 
     updatePeriod(world, clock);
 }
@@ -64,7 +65,7 @@ fn currentPeriod(hour: u8) component.time.Period {
     };
 }
 
-test "按存档倍率推进到整点会发出小时事件" {
+test "按存档倍率推进时间并处理分钟进位" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
     world.addResource(Clock{ .hour = 6, .minute = 59.0 });
@@ -75,8 +76,7 @@ test "按存档倍率推进到整点会发出小时事件" {
     try std.testing.expectEqual(7, clock.hour);
     try std.testing.expectEqual(1.0, clock.minute);
 
-    const hours = world.getEvent(event.HourChanged);
-    try std.testing.expectEqual(1, hours.len);
+    try std.testing.expectEqual(0, world.getEvent(event.DarkChanged).len);
 }
 
 test "时间推进跨天会发出新一天事件" {
@@ -98,12 +98,9 @@ test "时间推进跨天会发出新一天事件" {
     const days = world.getEvent(event.DayChanged);
     try std.testing.expectEqual(1, days.len);
     try std.testing.expectEqual(2, days[0].day);
-
-    const hours = world.getEvent(event.HourChanged);
-    try std.testing.expectEqual(1, hours.len);
 }
 
-test "按小时推进会清零分钟并逐小时发事件" {
+test "休息按小时推进并清零分钟" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
     world.addResource(Clock{
@@ -123,9 +120,6 @@ test "按小时推进会清零分钟并逐小时发事件" {
     const days = world.getEvent(event.DayChanged);
     try std.testing.expectEqual(1, days.len);
     try std.testing.expectEqual(2, days[0].day);
-
-    const hours = world.getEvent(event.HourChanged);
-    try std.testing.expectEqual(3, hours.len);
 }
 
 test "时段跨过边界会发出时段事件" {
@@ -145,4 +139,28 @@ test "时段跨过边界会发出时段事件" {
     const periods = world.getEvent(event.PeriodChanged);
     try std.testing.expectEqual(1, periods.len);
     try std.testing.expectEqual(currentPeriod(8), periods[0].period);
+}
+
+test "明暗变化事件覆盖自然推进和跨多个边界的休息" {
+    var world = ecs.World.init(std.testing.allocator);
+    defer world.deinit();
+    world.addResource(Clock{ .hour = 17, .minute = 59 });
+    world.addResource(Settings{});
+
+    update(&world, 0.1);
+    try std.testing.expectEqual(18, world.getResourcePtr(Clock).?.hour);
+    try std.testing.expectEqual(1, world.getEvent(event.DarkChanged).len);
+
+    update(&world, 0);
+    try std.testing.expectEqual(0, world.getEvent(event.DarkChanged).len);
+
+    world.addEvent(event.Rest{ .hours = 12 });
+    update(&world, 0);
+    try std.testing.expectEqual(6, world.getResourcePtr(Clock).?.hour);
+    try std.testing.expectEqual(1, world.getEvent(event.DarkChanged).len);
+
+    world.addEvent(event.Rest{ .hours = 24 });
+    update(&world, 0);
+    try std.testing.expectEqual(6, world.getResourcePtr(Clock).?.hour);
+    try std.testing.expectEqual(2, world.getEvent(event.DarkChanged).len);
 }

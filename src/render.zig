@@ -5,6 +5,7 @@ const ecs = @import("ecs");
 const component = @import("component.zig");
 const map = @import("map.zig");
 const Clock = @import("resource/Clock.zig");
+const Map = @import("resource/Map.zig");
 
 const World = ecs.World;
 const MapId = component.map.Id;
@@ -18,7 +19,7 @@ const Dialog = component.actor.Dialog;
 const Point = component.light.Point;
 const Spot = component.light.Spot;
 const Emissive = component.light.Emissive;
-const Disabled = component.light.Disabled;
+const Enabled = component.light.Enabled;
 
 const Keyframe = struct { hour: f32, color: zhu.Color };
 
@@ -63,7 +64,8 @@ pub fn deinit() void {
 
 pub fn draw(world: *const World) void {
     const clock = world.getResourcePtr(Clock).?;
-    const ambient = ambientColor(map.current, clock);
+    const outdoor = world.getResourcePtr(Map).?.outdoor;
+    const ambient = ambientColor(map.current, clock, outdoor);
     zhu.batch.beginDraw(ambient, .{ .target = &lightCanvas });
     drawLights(world);
 
@@ -138,7 +140,7 @@ fn drawBubble(head: zhu.Vector2, text: []const u8) void {
 }
 
 fn drawLights(world: *const World) void {
-    var points = world.queryNot(.{ Position, Point }, .{Disabled});
+    var points = world.query(.{ Position, Point, Enabled });
     while (points.next()) |row| {
         const position = row.get(Position);
         const point = row.get(Point);
@@ -147,7 +149,7 @@ fn drawLights(world: *const World) void {
         drawGlow(center, point.radius * 2.0, point.color.scaleAlpha(alpha));
     }
 
-    var spots = world.queryNot(.{ Position, Spot }, .{Disabled});
+    var spots = world.query(.{ Position, Spot, Enabled });
     while (spots.next()) |row| {
         const pos = row.get(Position);
         const spot = row.get(Spot);
@@ -164,7 +166,7 @@ fn drawLights(world: *const World) void {
 }
 
 fn drawEmissive(world: *const World) void {
-    var query = world.queryNot(.{ Position, Emissive }, .{Disabled});
+    var query = world.query(.{ Position, Emissive, Enabled });
     while (query.next()) |row| {
         const pos = row.get(Position);
         const em = row.get(Emissive);
@@ -180,8 +182,8 @@ fn drawEmissive(world: *const World) void {
     }
 }
 
-fn ambientColor(id: MapId, clock: *const Clock) zhu.Color {
-    if (!isOutdoor(id)) {
+fn ambientColor(id: MapId, clock: *const Clock, outdoor: bool) zhu.Color {
+    if (!outdoor) {
         const data = map.maps[@backingInt(id)];
         const ambient = data.getClass("ambient") orelse return .white;
         return .fromFloat(.{
@@ -212,13 +214,6 @@ fn ambientAt(hour: f32) zhu.Color {
     return keyframes[keyframes.len - 1].color;
 }
 
-fn isOutdoor(id: MapId) bool {
-    return switch (id) {
-        .town, .home_exterior => true,
-        .school, .home_interior => false,
-    };
-}
-
 fn drawGlow(center: zhu.Vector2, size: f32, color: zhu.Color) void {
     const position = center.add(.xy(-size * 0.5, -size * 0.5));
     zhu.batch.drawImage(glowImage, position, .{
@@ -236,8 +231,8 @@ fn smoothStep(value: f32) f32 {
 test "室内环境光优先使用地图配置，缺省为白色" {
     const clock = Clock{ .hour = 23 };
     const gray = zhu.Color.rgb(179, 179, 179);
-    try std.testing.expectEqual(gray, ambientColor(.home_interior, &clock));
-    try std.testing.expectEqual(zhu.Color.white, ambientColor(.school, &clock));
+    try std.testing.expectEqual(gray, ambientColor(.home_interior, &clock, false));
+    try std.testing.expectEqual(zhu.Color.white, ambientColor(.school, &clock, false));
 }
 
 test "ambient 正午为纯白原色" {

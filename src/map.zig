@@ -8,6 +8,7 @@ const loader = @import("map/loader.zig");
 const storage = @import("storage.zig");
 const Land = @import("map/Land.zig");
 const Clock = @import("resource/Clock.zig");
+const Map = @import("resource/Map.zig");
 
 const tiled = zhu.extend.tiled;
 const spatial = zhu.extend.spatial;
@@ -59,6 +60,10 @@ pub fn deinit(gpa: zhu.Allocator, world: *const World) void {
 
 pub fn enter(gpa: zhu.Allocator, world: *World, id: Id) void {
     current = id;
+    world.getResourcePtr(Map).?.outdoor = switch (id) {
+        .town, .home_exterior => true,
+        .school, .home_interior => false,
+    };
     load(gpa, world, maps[@backingInt(id)]);
     restoreCurrent(gpa, world);
 

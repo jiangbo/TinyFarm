@@ -222,7 +222,7 @@ pub const light = struct {
         intensity: f32 = 1.0,
     };
 
-    pub const Disabled = struct {};
+    pub const Enabled = struct {};
     pub const Night = struct {};
     pub const Day = struct {};
     pub const Pending = struct {};
@@ -254,7 +254,7 @@ pub const sound = struct {
 // 事件类型：系统间通信的一次性消息
 pub const event = struct {
     pub const Rest = struct { hours: u8 };
-    pub const HourChanged = struct {};
+    pub const DarkChanged = struct {};
     pub const DayChanged = struct { day: u32 };
     pub const PeriodChanged = struct {
         day: u32,

@@ -15,6 +15,7 @@ const ui = @import("ui.zig");
 const resource = struct {
     const Clock = @import("resource/Clock.zig");
     const Inventory = @import("resource/Inventory.zig");
+    const Map = @import("resource/Map.zig");
     const Notice = @import("resource/Notice.zig");
     const Settings = @import("resource/Settings.zig");
 };
@@ -39,6 +40,7 @@ pub fn init(allocator_: zhu.Allocator) void {
     world = World.init(allocator);
     world.addResource(resource.Clock{});
     world.addResource(resource.Inventory{});
+    world.addResource(resource.Map{});
     world.addResource(resource.Notice{});
     world.addResource(resource.Settings.load());
 
