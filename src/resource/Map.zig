@@ -133,11 +133,6 @@ fn appendGroundVertex(position: zhu.Vector2, image: zhu.Image) void {
     });
 }
 
-pub fn addSolidRect(self: *Map, gpa: std.mem.Allocator, rect: zhu.Rect) void {
-    std.debug.assert(rect.size.x > 0 and rect.size.y > 0);
-    self.areas.append(gpa, rect) catch zhu.oom();
-}
-
 // SolidRange 只记录对象加入 areas 时的起点和数量。
 pub fn solidAreas(self: *const Map, range: SolidRange) []zhu.Rect {
     return self.areas.items[range.start..][0..range.count];

@@ -253,20 +253,14 @@ pub fn spawnMapObject(
     return entity;
 }
 
-pub fn spawnMapTile(
-    world: *World,
-    data: tiled.Map,
-    globalId: u32,
-    index: usize,
-) Entity {
-    const topLeft = data.grid.indexToWorld(index);
-    const size = data.grid.cellSize();
+pub fn spawnMapTile(world: *World, data: tiled.Map, gid: u32, rect: zhu.Rect) Entity {
+    const topLeft = rect.min;
+    const size = rect.size;
     const position = topLeft.addY(size.y);
-    var image = data.getImage(globalId) orelse
-        zhu.graphics.Image{ .size = size };
+    var image = data.getImage(gid) orelse zhu.graphics.Image{ .size = size };
     const entity = world.createEntity();
 
-    if (data.getAnimation(globalId)) |baseAnimation| {
+    if (data.getAnimation(gid)) |baseAnimation| {
         var animation = baseAnimation;
         animation.source.loop = false;
         animation.stop();
@@ -284,7 +278,7 @@ pub fn spawnMapTile(
     world.add(entity, render.Render{ .layer = .actor });
     world.add(entity, render.YSort{});
 
-    if (data.getTile(globalId)) |tile| {
+    if (data.getTile(gid)) |tile| {
         addMapItemProduct(world, entity, tile);
     }
     return entity;

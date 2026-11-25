@@ -111,12 +111,12 @@ fn parseTileLayer(ctx: *Context, layer: *const tiled.Layer) void {
 }
 
 fn loadRockTile(ctx: *Context, globalId: u32, index: usize) void {
-    const entity = factory.spawnMapTile(ctx.world, //
-        ctx.map, globalId, index);
+    const rect = ctx.current.grid.indexToRect(index);
+    const entity = factory.spawnMapTile(ctx.world, ctx.map, globalId, rect);
     if (!ctx.world.has(entity, item.Product)) return;
 
     const start = ctx.current.areas.items.len;
-    ctx.current.addSolidRect(ctx.gpa, ctx.map.grid.indexToRect(index));
+    addSolidRect(ctx, rect);
     ctx.world.add(entity, SolidRange{ .start = start, .count = 1 });
     ctx.current.tiles[index].set(.product, entity);
 }
@@ -173,7 +173,7 @@ fn parseImageLayer(ctx: *Context, layer: *const tiled.Layer) void {
 fn parseObjectLayer(ctx: *Context, layer: *const tiled.Layer) void {
     if (layer.isNamed("collider")) {
         for (layer.objects) |object| {
-            ctx.current.addSolidRect(ctx.gpa, object.rect());
+            addSolidRect(ctx, object.rect());
         }
         return;
     }
@@ -277,6 +277,11 @@ fn loadProp(ctx: *Context, object: tiled.Object) void {
     }
 }
 
+fn addSolidRect(ctx: *Context, rect: zhu.Rect) void {
+    std.debug.assert(rect.size.x > 0 and rect.size.y > 0);
+    ctx.current.areas.append(ctx.gpa, rect) catch zhu.oom();
+}
+
 fn addSolidObject(ctx: *Context, object: tiled.Object) SolidRange {
     const start = ctx.current.areas.items.len;
     const tile = ctx.map.getTile(object.gid) orelse
@@ -287,10 +292,7 @@ fn addSolidObject(ctx: *Context, object: tiled.Object) SolidRange {
 
     for (group.objects) |local| {
         const position = topLeft.add(local.position);
-        ctx.current.addSolidRect(
-            ctx.gpa,
-            zhu.Rect.init(position, local.size),
-        );
+        addSolidRect(ctx, .init(position, local.size));
     }
     return .{
         .start = start,
