@@ -17,10 +17,33 @@ const ItemEnum = component.item.ItemEnum;
 const Pickup = component.item.Pickup;
 const Product = component.item.Product;
 const event = component.event;
+const render = component.render;
 const World = ecs.World;
 
 pub fn update(world: *World) void {
-    const player = world.getIdentity(Player).?;
+    updateTool(world);
+    const days = world.getEvent(event.DayChanged);
+    if (days.len == 0) return;
+
+    const current = map.getLoaded();
+    for (days) |_| {
+        for (current.land.tiles) |*tile| {
+            // 浇水只影响当天，跨天后湿地变干。
+            const watered = tile.ground == .wet;
+            if (watered) tile.ground = .dry;
+
+            const entity = tile.get(.crop) orelse continue;
+            const crop = world.getPtr(entity, Crop).?;
+            if (map.advanceCropOneDay(crop, watered)) {
+                map.refreshCropSprite(world, entity, crop.*);
+            }
+            crop.watered = false;
+        }
+    }
+}
+
+fn updateTool(world: *World) void {
+    const player = world.getIdentity(Player) orelse return;
     if (!world.has(player, UseFrame)) return;
 
     useItem(world, world.get(player, WantUse).?);
@@ -354,6 +377,70 @@ test "toolHit 会浇水并标记作物" {
     const sounds = world.getEvent(event.SoundPlay);
     try std.testing.expectEqual(1, sounds.len);
     try std.testing.expectEqual(.water, sounds[0].id);
+}
+
+test "当前地图跨天推进作物后刷新贴图和渲染层" {
+    var world = World.init(std.testing.allocator);
+    defer world.deinit();
+    map.load(std.testing.allocator, &world, testMap);
+    defer map.unload(std.testing.allocator);
+
+    const target = zhu.Vector2.xy(32, 48);
+    const crop = world.createEntity();
+    world.add(crop, Crop{
+        .kind = .strawberry,
+        .stage = .seed,
+        .next = 1,
+    });
+    world.add(crop, render.Sprite{ .image = .{} });
+    world.add(crop, render.Render{ .layer = .crop });
+    const tile = map.getTile(target).?;
+    tile.ground = .dry;
+    tile.set(.crop, crop);
+    world.addEvent(event.DayChanged{ .day = 2 });
+
+    update(&world);
+
+    const result = world.get(crop, Crop).?;
+    const stage = factory.cropStage(.strawberry, .sprout);
+    try std.testing.expectEqual(component.farm.GrowthEnum.sprout, result.stage);
+    try std.testing.expectEqual(stage.duration, result.next);
+    try std.testing.expectEqual(
+        stage.sprite.offset,
+        world.get(crop, render.Sprite).?.offset,
+    );
+    try std.testing.expectEqual(
+        render.Layer.actor,
+        world.get(crop, render.Render).?.layer,
+    );
+}
+
+test "同一帧先浇水，再结算跨天生长" {
+    var world = World.init(std.testing.allocator);
+    defer world.deinit();
+    map.load(std.testing.allocator, &world, testMap);
+    defer map.unload(std.testing.allocator);
+
+    const target = zhu.Vector2.xy(32, 48);
+    const crop = world.createEntity();
+    world.add(crop, Crop{
+        .kind = .strawberry,
+        .stage = .seed,
+        .next = 4,
+    });
+    const tile = map.getTile(target).?;
+    tile.ground = .dry;
+    tile.set(.crop, crop);
+    const player = world.createIdentity(Player);
+    world.add(player, WantUse{ .item = .water, .target = target });
+    world.add(player, UseFrame{});
+    world.addEvent(event.DayChanged{ .day = 2 });
+
+    update(&world);
+
+    const result = world.get(crop, Crop).?;
+    try std.testing.expectEqual(@as(f32, 2), result.next);
+    try std.testing.expectEqual(component.farm.Ground.dry, tile.ground);
 }
 
 test "斧头命中木材产出对象会减少生命" {

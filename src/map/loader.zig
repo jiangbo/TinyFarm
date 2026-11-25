@@ -39,14 +39,6 @@ pub const Loaded = struct {
         self.loaded = false;
     }
 
-    pub fn updateAnimations(self: *Loaded, delta: f32) void {
-        for (self.animatedTiles.items) |*tile| {
-            if (!tile.animation.update(delta)) continue;
-            const image = tile.animation.subImage();
-            self.vertexes.items[tile.vertex].uvRect = image.uvRect();
-        }
-    }
-
     fn addSolidRect(self: *Loaded, gpa: std.mem.Allocator, rect: zhu.Rect) void {
         std.debug.assert(rect.size.x > 0 and rect.size.y > 0);
         self.areas.append(gpa, rect) catch zhu.oom();

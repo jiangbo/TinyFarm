@@ -87,22 +87,8 @@ pub fn enter(gpa: std.mem.Allocator, world: *World, id: Id) void {
     _ = factory.spawnMapTrigger(world, trigger);
 }
 
-pub fn update(world: *const World, delta: f32) void {
-    loaded.updateAnimations(delta);
-    for (world.getEvent(component.event.DayChanged)) |_| {
-        for (loaded.land.tiles) |*tile| {
-            const watered = tile.ground == .wet;
-            // 当前地图和离线地图一致：每天结束湿地变干。
-            if (tile.ground == .wet) tile.ground = .dry;
-
-            const entity = tile.get(.crop) orelse continue;
-            const crop = world.getPtr(entity, farm.Crop).?;
-            if (advanceCropOneDay(crop, watered)) {
-                refreshCropSprite(world, entity, crop.*);
-            }
-            crop.watered = false;
-        }
-    }
+pub fn getLoaded() *loader.Loaded {
+    return &loaded;
 }
 
 pub fn exit(gpa: std.mem.Allocator, world: *const World) void {
@@ -351,7 +337,7 @@ fn advanceStateOneDay(state: *SaveMap) void {
     }
 }
 
-fn advanceCropOneDay(crop: *farm.Crop, watered: bool) bool {
+pub fn advanceCropOneDay(crop: *farm.Crop, watered: bool) bool {
     if (crop.stage == .mature) return false;
 
     crop.next -= if (watered) 2 else 1;
@@ -362,7 +348,7 @@ fn advanceCropOneDay(crop: *farm.Crop, watered: bool) bool {
     return true;
 }
 
-fn refreshCropSprite(world: *const World, entity: Entity, crop: farm.Crop) void {
+pub fn refreshCropSprite(world: *const World, entity: Entity, crop: farm.Crop) void {
     const cfg = factory.cropStage(crop.kind, crop.stage);
     world.getPtr(entity, render.Sprite).?.* = .{
         .image = factory.resolveImage(cfg.sprite),
@@ -445,43 +431,6 @@ test "湿地离线跨天只加速一天" {
     );
 }
 
-test "当前地图跨天推进作物后刷新贴图和渲染层" {
-    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(std.testing.allocator);
-
-    var world = ecs.World.init(std.testing.allocator);
-    defer world.deinit();
-
-    const target = zhu.Vector2.xy(32, 48);
-    const crop = world.createEntity();
-    world.add(crop, farm.Crop{
-        .kind = .strawberry,
-        .stage = .seed,
-        .next = 1,
-    });
-    world.add(crop, render.Sprite{ .image = .{} });
-    world.add(crop, render.Render{ .layer = .crop });
-    const tile = loaded.land.getTile(target).?;
-    tile.ground = .dry;
-    tile.set(.crop, crop);
-    world.addEvent(component.event.DayChanged{ .day = 2 });
-
-    update(&world, 0);
-
-    const result = world.get(crop, farm.Crop).?;
-    const stage = factory.cropStage(.strawberry, .sprout);
-    try std.testing.expectEqual(farm.GrowthEnum.sprout, result.stage);
-    try std.testing.expectEqual(stage.duration, result.next);
-    try std.testing.expectEqual(
-        stage.sprite.offset,
-        world.get(crop, render.Sprite).?.offset,
-    );
-    try std.testing.expectEqual(
-        render.Layer.actor,
-        world.get(crop, render.Render).?.layer,
-    );
-}
-
 test "当前地图和离线地图跨天推进规则一致" {
     loaded.land = Land.init(std.testing.allocator, maps[0].grid);
     defer loaded.land.deinit(std.testing.allocator);
@@ -515,7 +464,7 @@ test "当前地图和离线地图跨天推进规则一致" {
         .day = 1,
         .tiles = &tiles,
     };
-    update(&world, 0);
+    @import("system/farm.zig").update(&world);
     advanceState(&state, 2);
 
     const currentCrop = world.get(cropEntity, farm.Crop).?;
@@ -713,32 +662,6 @@ test "对象层产出对象按碰撞范围占用格子" {
     try std.testing.expectEqual(.none, loaded.land.tiles[0].gone);
     try std.testing.expectEqual(.product, loaded.land.tiles[1].gone);
     try std.testing.expect(!world.has(product, item.Product));
-}
-
-test "当前地图跨天会推进作物并清干湿地" {
-    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(std.testing.allocator);
-
-    var world = ecs.World.init(std.testing.allocator);
-    defer world.deinit();
-
-    const target = zhu.Vector2.xy(32, 48);
-    const crop = world.createEntity();
-    world.add(crop, farm.Crop{
-        .kind = .strawberry,
-        .stage = .seed,
-        .next = 4,
-    });
-    const tile = loaded.land.getTile(target).?;
-    tile.ground = .wet;
-    tile.set(.crop, crop);
-    world.addEvent(component.event.DayChanged{ .day = 2 });
-
-    update(&world, 0);
-
-    const result = world.get(crop, farm.Crop).?;
-    try std.testing.expectEqual(@as(f32, 2), result.next);
-    try std.testing.expectEqual(component.farm.Ground.dry, tile.ground);
 }
 
 test "canHoeTile 要求可耕作且没有地图阻挡语义" {

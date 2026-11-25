@@ -3,6 +3,7 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
+const map = @import("../map.zig");
 const Action = component.actor.Action;
 const Actor = component.actor.Actor;
 const Busy = component.actor.Busy;
@@ -40,6 +41,16 @@ pub fn update(world: *ecs.World, delta: f32) void {
             },
         };
         sprite.image = animation.subImage();
+    }
+    updateTiles(delta);
+}
+
+fn updateTiles(delta: f32) void {
+    const current = map.getLoaded();
+    for (current.animatedTiles.items) |*tile| {
+        if (!tile.animation.update(delta)) continue;
+        const image = tile.animation.subImage();
+        current.vertexes.items[tile.vertex].uvRect = image.uvRect();
     }
 }
 

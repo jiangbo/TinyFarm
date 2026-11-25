@@ -131,7 +131,6 @@ fn updatePlay(delta: f32) void {
     }
 
     system.update(&world, delta);
-    map.update(&world, delta);
     if (world.getByIdentity(actor.Interact, Rest) != null) ui.open(.rest);
 }
 
