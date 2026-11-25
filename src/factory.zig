@@ -103,6 +103,17 @@ pub fn cropStage(kind: farm.CropEnum, stage: farm.GrowthEnum) CropStage {
     return crops.get(kind).get(stage);
 }
 
+pub fn advanceCropOneDay(crop: *farm.Crop, watered: bool) bool {
+    if (crop.stage == .mature) return false;
+
+    crop.next -= if (watered) 2 else 1;
+    if (crop.next > 0) return false;
+
+    crop.stage = zhu.enums.next(crop.stage);
+    crop.next = cropStage(crop.kind, crop.stage).duration;
+    return true;
+}
+
 pub fn resolveImage(sprite: Sprite) zhu.graphics.Image {
     return zhu.assets.getImage(sprite.imageId).?.sub(sprite.rect);
 }
@@ -408,6 +419,16 @@ pub fn spawnCrop(
     world.add(entity, render.Render{ .layer = .crop });
     world.add(entity, render.YSort{});
     return entity;
+}
+
+pub fn refreshCropSprite(world: *const World, entity: Entity, crop: farm.Crop) void {
+    const cfg = cropStage(crop.kind, crop.stage);
+    world.getPtr(entity, render.Sprite).?.* = .{
+        .image = resolveImage(cfg.sprite),
+        .offset = cfg.sprite.offset,
+    };
+    if (crop.stage == .seed) return;
+    world.getPtr(entity, render.Render).?.layer = .actor;
 }
 
 pub fn spawnPickup(world: *World, args: struct {

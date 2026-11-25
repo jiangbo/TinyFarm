@@ -295,7 +295,8 @@ fn loadProp(ctx: *const Context, object: tiled.Object) void {
     if (ctx.world.has(entity, item.Product)) {
         if (solid.count != 0) {
             // 树这类对象按碰撞范围登记，不按更大的显示范围登记。
-            for (ctx.loaded.solidAreas(solid)) |area| {
+            const areas = ctx.loaded.areas.items[solid.start..][0..solid.count];
+            for (areas) |area| {
                 setProductTiles(ctx, entity, area);
             }
         } else {

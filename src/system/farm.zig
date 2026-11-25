@@ -35,8 +35,8 @@ pub fn update(world: *World) void {
 
             const entity = tile.get(.crop) orelse continue;
             const crop = world.getPtr(entity, Crop).?;
-            if (map.advanceCropOneDay(crop, watered)) {
-                map.refreshCropSprite(world, entity, crop.*);
+            if (factory.advanceCropOneDay(crop, watered)) {
+                factory.refreshCropSprite(world, entity, crop.*);
             }
             crop.watered = false;
         }
@@ -126,8 +126,8 @@ fn water(world: *World, current: *Map, position: zhu.Vector2) void {
 
 fn hitProduct(world: *World, current: *Map, want: WantUse) void {
     const hit = factory.itemConfig(want.item).hit.?;
-    const tile = current.getTile(want.target) orelse return;
-    const entity = tile.get(.product) orelse return;
+    const index = current.grid.worldToIndex(want.target) orelse return;
+    const entity = current.tiles[index].get(.product) orelse return;
     const product = world.getPtr(entity, Product).?;
     if (product.drop.item != hit.target) return;
 
@@ -149,7 +149,9 @@ fn hitProduct(world: *World, current: *Map, want: WantUse) void {
         .count = dropCount,
         .origin = origin,
     });
-    map.clearProduct(world, want.target);
+    const solid = world.get(entity, component.map.SolidRange);
+    current.clearProduct(index, solid);
+    world.destroyEntity(entity);
 }
 
 fn toolSound(tool: ItemEnum) component.sound.Id {

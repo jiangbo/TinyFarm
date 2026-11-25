@@ -14,14 +14,12 @@ const ui = @import("ui/ui.zig");
 const resource = struct {
     const Clock = @import("resource/Clock.zig");
     const Inventory = @import("resource/Inventory.zig");
-    const Map = @import("resource/Map.zig");
     const Notice = @import("resource/Notice.zig");
     const Settings = @import("resource/Settings.zig");
 };
 
 const World = ecs.World;
 const actor = component.actor;
-const Position = component.Position;
 const Rest = component.map.Rest;
 const Transition = component.map.Transition;
 const Trigger = component.map.Trigger;
@@ -53,7 +51,8 @@ pub fn init(allocator_: std.mem.Allocator) void {
 
 pub fn deinit() void {
     render.deinit();
-    map.deinit(allocator, &world);
+    map.unload(allocator, &world);
+    storage.deinit(allocator);
     ui.deinit();
     world.deinit();
 }
@@ -193,7 +192,7 @@ fn enterPlay(loadSlot: ?u8) void {
     clock.reset();
     world.getResourcePtr(resource.Notice).?.reset();
     world.getResourcePtr(resource.Settings).?.lightOn = false;
-    map.resetState();
+    storage.resetMaps();
 
     resetWorld();
     map.enter(allocator, &world, .home_exterior);
@@ -212,10 +211,7 @@ fn enterPlay(loadSlot: ?u8) void {
 }
 
 fn save(slot: u8) bool {
-    const record = capture();
-    defer record.maps.deinit(allocator);
-
-    storage.write(slot, record) catch |err| {
+    storage.save(allocator, &world, slot) catch |err| {
         std.log.err("save slot {} failed: {}", .{ slot, err });
         return false;
     };
@@ -229,44 +225,20 @@ fn load(slot: u8) bool {
     };
     defer record.deinit();
 
-    restore(record.value);
-    return true;
-}
-
-fn capture() storage.Record {
-    const clock = world.getResourcePtr(resource.Clock).?;
-    const inv = world.getResourcePtr(resource.Inventory).?;
-
-    return .{
-        .timestamp = zhu.timestamp().toSeconds(),
-        .clock = clock.*,
-        .player = capturePlayer(),
-        .inventory = inv.capture(),
-        .maps = map.capture(allocator, &world),
-        .timeScale = world.getResourcePtr(resource.Settings).?.timeScale,
-    };
-}
-
-fn restore(record: storage.Record) void {
-    const clock = world.getResourcePtr(resource.Clock).?;
-    const settings = world.getResourcePtr(resource.Settings).?;
-
-    clock.* = record.clock;
-    world.getResourcePtr(resource.Notice).?.reset();
-    settings.timeScale = record.timeScale;
-    settings.lightOn = false;
-
+    const player = record.value.player;
     map.unload(allocator, &world);
-    map.restore(allocator, record.maps, clock.day);
+    storage.restore(allocator, &world, record.value);
+    world.getResourcePtr(resource.Notice).?.reset();
+    world.getResourcePtr(resource.Settings).?.lightOn = false;
 
     resetWorld();
-    map.enter(allocator, &world, record.player.map);
-    factory.spawnPlayer(&world, record.player.position, record.player.facing);
-    zhu.camera.directFollow(record.player.position);
+    map.enter(allocator, &world, player.map);
+    factory.spawnPlayer(&world, player.position, player.facing);
+    zhu.camera.directFollow(player.position);
     system.light.update(&world);
     system.sort.update(&world);
     ui.resetInventory();
-    world.getResourcePtr(resource.Inventory).?.restore(record.inventory);
+    return true;
 }
 
 fn spawnPlayer(targetId: i32) void {
@@ -292,18 +264,6 @@ fn triggerPosition(trigger: Trigger) zhu.Vector2 {
         .top => .xy(center.x, trigger.rect.min.y - offset),
         .bottom => .xy(center.x, trigger.rect.max().y + offset),
         .none => center,
-    };
-}
-
-fn capturePlayer() storage.Player {
-    const entity = world.getIdentity(actor.Player).?;
-    const position = world.get(entity, Position).?;
-    const state = world.get(entity, actor.Actor) orelse actor.Actor{};
-
-    return .{
-        .map = world.getResourcePtr(resource.Map).?.id,
-        .position = position,
-        .facing = state.facing,
     };
 }
 

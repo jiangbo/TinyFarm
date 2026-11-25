@@ -3,7 +3,6 @@ const zhu = @import("zhu");
 
 const component = @import("../component.zig");
 const factory = @import("../factory.zig");
-const storage = @import("../storage.zig");
 
 const ItemEnum = component.item.ItemEnum;
 const Store = zhu.extend.bag.Store(ItemEnum, 40, stackLimit);
@@ -28,22 +27,6 @@ pub fn reset(self: *Self) void {
     self.hotbar = @splat(null);
     self.activeHotbar = 0;
     self.activePage = 0;
-}
-
-pub fn capture(self: *const Self) storage.Inventory {
-    return .{
-        .activeHotbar = self.activeHotbar,
-        .activePage = self.activePage,
-        .slots = self.store.stacks[0..],
-        .hotbar = self.hotbar[0..],
-    };
-}
-
-pub fn restore(self: *Self, data: storage.Inventory) void {
-    @memcpy(self.store.stacks[0..], data.slots);
-    @memcpy(self.hotbar[0..], data.hotbar);
-    self.activeHotbar = data.activeHotbar;
-    self.activePage = data.activePage;
 }
 
 pub fn add(self: *Self, itemType: ItemEnum, count: u32) u32 {
@@ -322,21 +305,4 @@ test "使用物品空间不足时返回 full 且不绑定产物" {
 
     try std.testing.expectEqual(Use.full, result);
     try std.testing.expectEqual(null, inv.hotbar[0]);
-}
-
-test "背包恢复保留槽位、页面和快捷栏绑定" {
-    var original: Self = .{ .activeHotbar = 1, .activePage = 1 };
-    original.store.stacks[5] = .{ .item = .potato, .count = 7 };
-    original.hotbar[1] = 5;
-
-    var restored: Self = .{};
-    restored.store.stacks[0] = .{ .item = .strawberry, .count = 2 };
-    restored.hotbar[0] = 0;
-    restored.restore(original.capture());
-
-    try std.testing.expectEqualDeep(original.store.stacks, restored.store.stacks);
-    try std.testing.expectEqualDeep(original.hotbar, restored.hotbar);
-    try std.testing.expectEqual(original.activePage, restored.activePage);
-    try std.testing.expectEqual(original.activeHotbar, restored.activeHotbar);
-    try std.testing.expectEqual(.potato, restored.active().?);
 }

@@ -108,12 +108,21 @@ fn appendGroundVertex(position: zhu.Vector2, image: zhu.Image) void {
     });
 }
 
-// SolidRange 只记录对象加入 areas 时的起点和数量。
-pub fn solidAreas(self: *const Map, range: SolidRange) []zhu.Rect {
-    return self.areas.items[range.start..][0..range.count];
-}
-
 pub fn getTile(self: *const Map, position: zhu.Vector2) ?*Tile {
     const index = self.grid.worldToIndex(position) orelse return null;
     return &self.tiles[index];
+}
+
+// 清除默认产出对象，标记为 gone，防止读档时重建。
+pub fn clearProduct(self: *Map, index: usize, solid: ?SolidRange) void {
+    const entity = self.tiles[index].get(.product).?;
+    if (solid) |range| {
+        const areas = self.areas.items[range.start..][0..range.count];
+        for (areas) |*area| area.* = .init(.zero, .zero);
+    }
+    for (self.tiles) |*tile| {
+        if (tile.get(.product) == entity) tile.object = null;
+    }
+    // gone 只记录在触发销毁的格子上。
+    self.tiles[index].gone = .product;
 }
