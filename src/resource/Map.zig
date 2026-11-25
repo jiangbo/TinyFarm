@@ -44,9 +44,11 @@ pub const Tile = struct {
 
 id: component.map.Id = .school,
 grid: Grid = undefined,
+props: struct {
+    outdoor: bool = false,
+    indoorAmbient: zhu.Color = .white,
+} = .{},
 tiles: []Tile = &.{},
-/// 当前地图是否位于室外，进入地图时更新。
-outdoor: bool = false,
 vertexes: std.ArrayList(zhu.Vertex) = .empty,
 animatedTiles: std.ArrayList(AnimatedTile) = .empty,
 frontStart: usize = 0,

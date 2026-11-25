@@ -49,6 +49,14 @@ const Context = struct {
 
 pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map, out: *Map) Loaded {
     const grid = map.grid;
+    if (map.getClass("ambient")) |ambient| {
+        out.props.indoorAmbient = .fromFloat(.{
+            .r = ambient.get("red", f32) orelse 1,
+            .g = ambient.get("green", f32) orelse 1,
+            .b = ambient.get("blue", f32) orelse 1,
+            .a = 1,
+        });
+    }
     var result: Loaded = .{};
     result.collision.mask = spatial.SolidMask.init(gpa, .{
         .width = grid.width * 2,

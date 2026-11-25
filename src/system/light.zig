@@ -21,7 +21,7 @@ pub fn update(world: *ecs.World) void {
 
     const player = world.getIdentity(component.actor.Player) orelse return;
     const settings = world.getResourcePtr(Settings).?;
-    const allowed = !world.getResourcePtr(Map).?.outdoor or dark;
+    const allowed = !world.getResourcePtr(Map).?.props.outdoor or dark;
     if (settings.lightOn and allowed) {
         world.add(player, Enabled{});
     } else {
@@ -93,7 +93,7 @@ test "随身灯遵守手动开关、室内外和昼夜边界" {
         .{ .outdoor = false, .hour = 6, .on = false, .enabled = false },
     };
     for (cases) |case| {
-        world.getResourcePtr(Map).?.outdoor = case.outdoor;
+        world.getResourcePtr(Map).?.props.outdoor = case.outdoor;
         world.getResourcePtr(Clock).?.hour = case.hour;
         world.getResourcePtr(Settings).?.lightOn = case.on;
         update(&world);

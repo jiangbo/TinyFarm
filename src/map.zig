@@ -25,7 +25,7 @@ pub const Id = component.map.Id;
 pub const StartOffset = component.map.StartOffset;
 pub const Hit = component.map.Hit;
 
-pub const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
+const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
     @import("zon/maps/school.zon"),
     @import("zon/maps/town.zon"),
     @import("zon/maps/home_exterior.zon"),
@@ -46,7 +46,7 @@ pub fn enter(gpa: std.mem.Allocator, world: *World, id: Id) void {
     load(gpa, world, maps[@backingInt(id)]);
     const current = world.getResourcePtr(Map).?;
     current.id = id;
-    current.outdoor = switch (id) {
+    current.props.outdoor = switch (id) {
         .town, .home_exterior => true,
         .school, .home_interior => false,
     };

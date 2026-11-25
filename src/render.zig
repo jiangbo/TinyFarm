@@ -3,12 +3,10 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("component.zig");
-const map = @import("map.zig");
 const Clock = @import("resource/Clock.zig");
 const Map = @import("resource/Map.zig");
 
 const World = ecs.World;
-const MapId = component.map.Id;
 const Position = component.Position;
 const Render = component.render.Render;
 const Sprite = component.render.Sprite;
@@ -74,7 +72,7 @@ pub fn deinit() void {
 pub fn draw(world: *const World) void {
     const clock = world.getResourcePtr(Clock).?;
     const current = world.getResourcePtr(Map).?;
-    const ambient = ambientColor(current.id, clock, current.outdoor);
+    const ambient = ambientColor(current, clock);
     zhu.batch.beginDraw(ambient, .{ .target = &lightCanvas });
     drawLights(world);
 
@@ -192,17 +190,8 @@ fn drawEmissive(world: *const World) void {
     }
 }
 
-fn ambientColor(id: MapId, clock: *const Clock, outdoor: bool) zhu.Color {
-    if (!outdoor) {
-        const data = map.maps[@backingInt(id)];
-        const ambient = data.getClass("ambient") orelse return .white;
-        return .fromFloat(.{
-            .r = ambient.get("red", f32) orelse 1,
-            .g = ambient.get("green", f32) orelse 1,
-            .b = ambient.get("blue", f32) orelse 1,
-            .a = 1,
-        });
-    }
+fn ambientColor(current: *const Map, clock: *const Clock) zhu.Color {
+    if (!current.props.outdoor) return current.props.indoorAmbient;
     const hour = @as(f32, @floatFromInt(clock.hour)) + clock.minute / 60;
     return ambientAt(hour);
 }
