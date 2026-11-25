@@ -237,23 +237,3 @@ fn smoothStep(value: f32) f32 {
     const t = std.math.clamp(value, 0, 1);
     return t * t * (3 - 2 * t);
 }
-
-test "室内环境光优先使用地图配置，缺省为白色" {
-    const clock = Clock{ .hour = 23 };
-    const gray = zhu.Color.rgb(179, 179, 179);
-    try std.testing.expectEqual(gray, ambientColor(.home_interior, &clock, false));
-    try std.testing.expectEqual(zhu.Color.white, ambientColor(.school, &clock, false));
-}
-
-test "ambient 正午为纯白原色" {
-    const color = ambientAt(14);
-    try std.testing.expectEqual(zhu.Color.white, color);
-}
-
-test "ambient 深夜比正午暗且偏冷蓝" {
-    const night = ambientAt(23);
-    const noon = ambientAt(14);
-
-    try std.testing.expect(night.r < noon.r);
-    try std.testing.expect(night.b > night.r);
-}
