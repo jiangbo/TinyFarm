@@ -2,7 +2,6 @@ const std = @import("std");
 const zhu = @import("zhu");
 const ecs = @import("ecs");
 
-const input = @import("input.zig");
 const pause = @import("ui/pause.zig");
 const save = @import("ui/save.zig");
 const Settings = @import("resource/Settings.zig");
@@ -45,7 +44,7 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
 
     if (popup) |active| return updatePopup(world, active);
 
-    const pauseKey = input.released(.pause);
+    const pauseKey = zhu.action.released(.pause);
     if (pauseKey or pauseButton.update(.{}) != null) {
         pause.open(.title);
         popup = .pause;

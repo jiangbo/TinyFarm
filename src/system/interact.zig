@@ -3,7 +3,6 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
-const input = @import("../input.zig");
 const map = @import("../map.zig");
 
 const World = ecs.World;
@@ -20,7 +19,7 @@ pub fn update(world: *World) void {
 
     // 对话中按键由 dialog 系统消费，不再重新寻找目标。
     if (world.getIdentity(Dialog) != null) return;
-    if (!input.pressed(.interact)) return;
+    if (!zhu.action.pressed(.interact)) return;
 
     const player = world.getIdentity(Player).?;
     const playerPos = targetCenter(world, player);

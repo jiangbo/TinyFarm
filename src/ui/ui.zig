@@ -2,7 +2,6 @@ const std = @import("std");
 const zhu = @import("zhu");
 const ecs = @import("ecs");
 
-const input = @import("../input.zig");
 const inventory = @import("inventory.zig");
 const notice = @import("notice.zig");
 const rest = @import("rest.zig");
@@ -68,7 +67,7 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
         zhu.mouse.captured = true;
     }
 
-    if (input.released(.pause) or pauseButton.update(.{}) != null) {
+    if (zhu.action.released(.pause) or pauseButton.update(.{}) != null) {
         open(.pause);
         return .block;
     }

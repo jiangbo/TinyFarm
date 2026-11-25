@@ -3,7 +3,6 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
-const input = @import("../input.zig");
 
 const World = ecs.World;
 const Entity = ecs.Entity;
@@ -17,7 +16,7 @@ const Velocity = component.motion.Velocity;
 pub fn update(world: *World) void {
     if (world.getIdentity(Dialog)) |target| {
         checkDistance(world, target);
-        if (input.pressed(.interact)) advanceDialog(world, target);
+        if (zhu.action.pressed(.interact)) advanceDialog(world, target);
         return;
     }
 

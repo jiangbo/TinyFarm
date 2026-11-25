@@ -1,7 +1,6 @@
 const std = @import("std");
 const zhu = @import("zhu");
 
-const input = @import("../input.zig");
 const item = @import("item.zig");
 const Inventory = @import("../resource/Inventory.zig");
 
@@ -48,7 +47,7 @@ pub fn reset() void {
 }
 
 pub fn update(inv: *Inventory) bool {
-    if (input.pressed(.inventory)) closed = !closed;
+    if (zhu.action.pressed(.inventory)) closed = !closed;
     if (closed) {
         const captured = drag != null;
         click, drag = .{ .empty, null };

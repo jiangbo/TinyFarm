@@ -3,7 +3,6 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
-const input = @import("../input.zig");
 const Inventory = @import("../resource/Inventory.zig");
 const Settings = @import("../resource/Settings.zig");
 const map = @import("../map.zig");
@@ -27,7 +26,7 @@ const tileRange: i32 = 1;
 pub fn update(world: *World) void {
     const player = world.getIdentity(Player).?;
 
-    if (input.pressed(.light)) {
+    if (zhu.action.pressed(.light)) {
         const settings = world.getResourcePtr(Settings).?;
         settings.lightOn = !settings.lightOn;
     }
@@ -58,10 +57,10 @@ fn updateMovement(world: *const World, player: Entity) void {
 
 fn readDirection() zhu.Vector2 {
     var direction: zhu.Vector2 = .zero;
-    if (input.held(.left)) direction.x -= 1;
-    if (input.held(.right)) direction.x += 1;
-    if (input.held(.up)) direction.y -= 1;
-    if (input.held(.down)) direction.y += 1;
+    if (zhu.action.held(.left)) direction.x -= 1;
+    if (zhu.action.held(.right)) direction.x += 1;
+    if (zhu.action.held(.up)) direction.y -= 1;
+    if (zhu.action.held(.down)) direction.y += 1;
 
     if (direction.length2() > 1) return direction.normalize();
     return direction;

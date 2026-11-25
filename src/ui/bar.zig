@@ -1,6 +1,5 @@
 const zhu = @import("zhu");
 
-const input = @import("../input.zig");
 const item = @import("item.zig");
 const Inventory = @import("../resource/Inventory.zig");
 
@@ -29,12 +28,17 @@ pub fn reset() void {
 }
 
 pub fn update(inv: *Inventory) void {
-    if (input.pressed(.hotbar)) {
+    if (zhu.action.pressed(.hotbar)) {
         visible = !visible;
         click = .empty;
     }
 
-    if (input.hotbarPressed()) |index| inv.activeHotbar = index;
+    const keys = zhu.action.get(.hotbars);
+    for (keys[0..@min(keys.len, inv.hotbar.len)], 0..) |code, index| {
+        if (!zhu.key.pressed(code)) continue;
+        inv.activeHotbar = index;
+        break;
+    }
 
     if (!visible) return;
 

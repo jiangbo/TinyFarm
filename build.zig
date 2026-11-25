@@ -8,6 +8,20 @@ pub fn build(b: *std.Build) !void {
     const zhuyu = b.dependency("zhuyu", .{
         .target = target,
         .optimize = optimize,
+        .action = b.addWriteFiles().add("action.zon",
+            \\.{
+            \\    .left = .{ .A, .LEFT },
+            \\    .right = .{ .D, .RIGHT },
+            \\    .up = .{ .W, .UP },
+            \\    .down = .{ .S, .DOWN },
+            \\    .pause = .{ .P, .ESCAPE },
+            \\    .interact = .{.F},
+            \\    .light = .{.L},
+            \\    .inventory = .{.I},
+            \\    .hotbar = .{.TAB},
+            \\    .hotbars = .{ ._1, ._2, ._3, ._4, ._5, ._6, ._7, ._8, ._9, ._0 },
+            \\}
+        ),
     });
     const migu = b.dependency("migu", .{
         .target = target,
