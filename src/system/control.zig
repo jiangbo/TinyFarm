@@ -5,7 +5,7 @@ const ecs = @import("ecs");
 const component = @import("../component.zig");
 const Inventory = @import("../resource/Inventory.zig");
 const Settings = @import("../resource/Settings.zig");
-const map = @import("../map.zig");
+const Map = @import("../resource/Map.zig");
 
 const Actor = component.actor.Actor;
 const Facing = component.actor.Facing;
@@ -70,17 +70,18 @@ fn targetPosition(world: *const World, player: Entity) ?zhu.Vector2 {
     if (zhu.mouse.captured) return null;
 
     const playerPos = world.get(player, Position).?;
-    const playerTile = map.grid.worldToCell(playerPos);
+    const grid = world.getResourcePtr(Map).?.grid;
+    const playerTile = grid.worldToCell(playerPos);
     const mouseWorld = zhu.camera.toWorld(zhu.mouse.pos);
-    const mouseTile = map.grid.worldToCell(mouseWorld);
+    const mouseTile = grid.worldToCell(mouseWorld);
 
-    if (map.grid.cellToIndex(mouseTile) == null) return null;
+    if (grid.cellToIndex(mouseTile) == null) return null;
 
     const outOfRangeX = @abs(mouseTile.x - playerTile.x) > tileRange;
     const outOfRangeY = @abs(mouseTile.y - playerTile.y) > tileRange;
     if (outOfRangeX or outOfRangeY) return null;
 
-    return map.grid.cellToWorld(mouseTile);
+    return grid.cellToWorld(mouseTile);
 }
 
 fn updateTargetAction(world: *World, player: Entity) void {
@@ -152,6 +153,10 @@ fn setActiveItem(world: *World, item: ItemEnum, count: u32) void {
 }
 
 fn addTestPlayer(world: *World, position: zhu.Vector2) Entity {
+    world.addResource(Map{
+        .id = .school,
+        .grid = .{ .width = 4, .height = 5, .cellSide = 16 },
+    });
     const player = world.createIdentity(Player);
     world.add(player, position);
     world.add(player, Velocity{});

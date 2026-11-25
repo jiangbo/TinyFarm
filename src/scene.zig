@@ -257,7 +257,7 @@ fn restore(record: storage.Record) void {
     settings.timeScale = record.timeScale;
     settings.lightOn = false;
 
-    map.unload(allocator);
+    map.unload(allocator, &world);
     map.restore(allocator, record.maps, clock.day);
 
     resetWorld();
@@ -302,7 +302,7 @@ fn capturePlayer() storage.Player {
     const state = world.get(entity, actor.Actor) orelse actor.Actor{};
 
     return .{
-        .map = map.current,
+        .map = world.getResourcePtr(resource.Map).?.id,
         .position = position,
         .facing = state.facing,
     };

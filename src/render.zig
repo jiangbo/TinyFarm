@@ -74,21 +74,18 @@ pub fn deinit() void {
 
 pub fn draw(world: *const World) void {
     const clock = world.getResourcePtr(Clock).?;
-    const outdoor = world.getResourcePtr(Map).?.outdoor;
-    const ambient = ambientColor(map.current, clock, outdoor);
+    const current = world.getResourcePtr(Map).?;
+    const ambient = ambientColor(current.id, clock, current.outdoor);
     zhu.batch.beginDraw(ambient, .{ .target = &lightCanvas });
     drawLights(world);
 
     zhu.batch.useTarget(clearColor, .{ .target = &canvas });
     const loaded = map.getLoaded();
-    const vertexes = loaded.vertexes.items;
-    const back = vertexes[0..loaded.frontStart];
-    const front = vertexes[loaded.frontStart..];
-    if (vertexes.len != 0) zhu.batch.drawVertices(mapImage, back);
+    current.drawBack(mapImage);
     drawGround(&loaded.land);
     drawSprites(world);
-    if (front.len != 0) zhu.batch.drawVertices(mapImage, front);
-    drawTarget(world);
+    current.drawFront(mapImage);
+    drawTarget(world, current.grid.cellSize());
     // 对比过不参与光照的效果，确认保留对话气泡参与光照合成。
     drawDialog(world);
     zhu.batch.drawCamera(lightCanvas.image, .zero, .window, .{});
@@ -138,12 +135,12 @@ fn drawSprites(world: *const World) void {
     }
 }
 
-fn drawTarget(world: *const World) void {
+fn drawTarget(world: *const World, cellSize: zhu.Vector2) void {
     const player = world.getIdentity(Player).?;
     const target = world.get(player, Target).?;
     if (!target.active) return;
 
-    const rect = zhu.Rect.init(target.position, map.grid.cellSize());
+    const rect = zhu.Rect.init(target.position, cellSize);
     zhu.batch.drawRect(rect, .{ .color = target.color });
 }
 

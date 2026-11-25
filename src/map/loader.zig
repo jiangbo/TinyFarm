@@ -5,6 +5,7 @@ const ecs = @import("ecs");
 const component = @import("../component.zig");
 const factory = @import("../factory.zig");
 const Land = @import("Land.zig");
+const Map = @import("../resource/Map.zig");
 
 const tiled = zhu.extend.tiled;
 const spatial = zhu.extend.spatial;
@@ -17,15 +18,10 @@ const Trigger = component.map.Trigger;
 const SolidRange = component.map.SolidRange;
 const mock: []const tiled.Map = @import("../zon/maps/mock.zon");
 
-const AnimatedTile = struct { vertex: usize, animation: zhu.Animation };
-
 pub const Loaded = struct {
     land: Land = .{},
     collision: spatial.Static = .{},
     areas: std.ArrayList(zhu.Rect) = .empty,
-    vertexes: std.ArrayList(zhu.Vertex) = .empty,
-    animatedTiles: std.ArrayList(AnimatedTile) = .empty,
-    frontStart: usize = 0,
     loaded: bool = false,
 
     pub fn deinit(self: *Loaded, gpa: std.mem.Allocator) void {
@@ -33,9 +29,6 @@ pub const Loaded = struct {
         self.land.deinit(gpa);
         self.collision.deinit(gpa);
         self.areas.clearAndFree(gpa);
-        self.vertexes.clearAndFree(gpa);
-        self.animatedTiles.clearAndFree(gpa);
-        self.frontStart = 0;
         self.loaded = false;
     }
 
@@ -55,9 +48,10 @@ const Context = struct {
     map: tiled.Map,
     world: *World,
     loaded: *Loaded,
+    visual: *Map,
 };
 
-pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map) Loaded {
+pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map, out: *Map) Loaded {
     const grid = map.grid;
     var result: Loaded = .{ .land = Land.init(gpa, grid) };
     result.collision.mask = spatial.SolidMask.init(gpa, .{
@@ -71,6 +65,7 @@ pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map) Loaded {
         .map = map,
         .world = world,
         .loaded = &result,
+        .visual = out,
     };
     parseLayers(&ctx);
     // 建表后不再追加矩形，销毁物件只需将对应矩形置空。
@@ -90,8 +85,8 @@ fn parseLayers(ctx: *Context) void {
         .image => parseImageLayer(ctx, layer),
         .object => {
             if (!foundFrontLayer and layer.isNamed("main")) {
-                const start = ctx.loaded.vertexes.items.len;
-                ctx.loaded.frontStart = start;
+                const start = ctx.visual.vertexes.items.len;
+                ctx.visual.frontStart = start;
                 foundFrontLayer = true;
             }
             parseObjectLayer(ctx, layer);
@@ -99,13 +94,13 @@ fn parseLayers(ctx: *Context) void {
     };
 
     if (!foundFrontLayer) {
-        ctx.loaded.frontStart = ctx.loaded.vertexes.items.len;
+        ctx.visual.frontStart = ctx.visual.vertexes.items.len;
     }
 
     std.log.info("map loaded: {}x{}, tiles: {}", .{
         ctx.map.grid.width,
         ctx.map.grid.height,
-        ctx.loaded.vertexes.items.len,
+        ctx.visual.vertexes.items.len,
     });
 }
 
@@ -128,12 +123,8 @@ fn parseTileLayer(ctx: *Context, layer: *const tiled.Layer) void {
         if (ctx.map.getImage(globalId)) |image| {
             const position = ctx.map.grid.indexToWorld(index);
             if (ctx.map.getAnimation(globalId)) |animation| {
-                ctx.loaded.animatedTiles.append(ctx.gpa, .{
-                    .vertex = ctx.loaded.vertexes.items.len,
-                    .animation = animation,
-                }) catch zhu.oom();
-                appendVertex(ctx, position, animation.subImage());
-            } else appendVertex(ctx, position, image);
+                ctx.visual.addAnimatedTile(ctx.gpa, position, animation);
+            } else ctx.visual.addImage(ctx.gpa, position, image);
         }
 
         const tile = ctx.map.getTile(globalId) orelse continue;
@@ -200,7 +191,7 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
 fn parseImageLayer(ctx: *Context, layer: *const tiled.Layer) void {
     const image = zhu.assets.getImage(layer.image).?
         .sub(.init(.zero, .xy(layer.width, layer.height)));
-    appendVertex(ctx, layer.offset, image);
+    ctx.visual.addImage(ctx.gpa, layer.offset, image);
 }
 
 fn parseObjectLayer(ctx: *Context, layer: *const tiled.Layer) void {
@@ -347,15 +338,6 @@ fn loadLight(ctx: *Context, object: tiled.Object) void {
     }
 }
 
-fn appendVertex(ctx: *Context, position: zhu.Vector2, image: zhu.Image) void {
-    ctx.loaded.vertexes.append(ctx.gpa, .{
-        .position = position,
-        .layer = image.layer,
-        .size = image.size,
-        .uvRect = image.uvRect(),
-    }) catch zhu.oom();
-}
-
 // 对象层产出按碰撞范围登记；没有碰撞范围时退回到传入矩形。
 fn setProductTiles(ctx: *Context, entity: ecs.Entity, rect: zhu.Rect) void {
     var iter = ctx.map.grid.indicesInRect(rect);
@@ -368,7 +350,9 @@ test "actor 点对象会生成 NPC，player 点对象只保留标记" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var loaded = load(std.testing.allocator, &world, mock[0]);
+    var visual = Map{ .grid = mock[0].grid };
+    defer visual.deinit(std.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, mock[0], &visual);
     defer loaded.deinit(std.testing.allocator);
 
     var query = world.query(.{
@@ -395,7 +379,9 @@ test "trigger 对象会创建 ECS 触发器实体" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var loaded = load(std.testing.allocator, &world, mock[1]);
+    var visual = Map{ .grid = mock[1].grid };
+    defer visual.deinit(std.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, mock[1], &visual);
     defer loaded.deinit(std.testing.allocator);
 
     var query = world.query(.{component.map.Trigger});
@@ -415,7 +401,9 @@ test "rest 对象会创建可交互实体" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var loaded = load(std.testing.allocator, &world, mock[2]);
+    var visual = Map{ .grid = mock[2].grid };
+    defer visual.deinit(std.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, mock[2], &visual);
     defer loaded.deinit(std.testing.allocator);
 
     var query = world.query(.{
@@ -473,7 +461,9 @@ test "加载地图产出对象会按对象和 rock 图层写入目标格" {
 
     var testMap = mock[3];
     testMap.tileSets = &testTileSets;
-    var loaded = load(std.testing.allocator, &world, testMap);
+    var visual = Map{ .grid = testMap.grid };
+    defer visual.deinit(std.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, testMap, &visual);
     defer loaded.deinit(std.testing.allocator);
 
     const tree = loaded.land.tiles[0].object.?;

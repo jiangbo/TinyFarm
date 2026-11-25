@@ -33,8 +33,6 @@ pub const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
     @import("zon/maps/home_interior.zon"),
 });
 
-pub var current: Id = .school;
-pub var grid: spatial.Grid = maps[0].grid;
 var loaded: loader.Loaded = .{};
 var states: std.EnumArray(Id, SaveMap) = .initFill(.{});
 
@@ -46,12 +44,13 @@ pub fn deinit(gpa: std.mem.Allocator, world: *const World) void {
 }
 
 pub fn enter(gpa: std.mem.Allocator, world: *World, id: Id) void {
-    current = id;
-    world.getResourcePtr(Map).?.outdoor = switch (id) {
+    load(gpa, world, maps[@backingInt(id)]);
+    const current = world.getResourcePtr(Map).?;
+    current.id = id;
+    current.outdoor = switch (id) {
         .town, .home_exterior => true,
         .school, .home_interior => false,
     };
-    load(gpa, world, maps[@backingInt(id)]);
     restoreCurrent(gpa, world);
 
     // 原始地图没有住宅室外与城镇的连接，由游戏补充。
@@ -81,17 +80,18 @@ pub fn getLoaded() *loader.Loaded {
 
 pub fn exit(gpa: std.mem.Allocator, world: *const World) void {
     saveCurrent(gpa, world);
-    unload(gpa);
+    unload(gpa, world);
 }
 
 pub fn load(gpa: std.mem.Allocator, world: *World, mapData: tiled.Map) void {
-    grid = mapData.grid;
-    zhu.camera.bound = grid.size();
-    loaded = loader.load(gpa, world, mapData);
+    world.addResource(Map{ .grid = mapData.grid });
+    zhu.camera.bound = mapData.grid.size();
+    loaded = loader.load(gpa, world, mapData, world.getResourcePtr(Map).?);
 }
 
-pub fn unload(gpa: std.mem.Allocator) void {
+pub fn unload(gpa: std.mem.Allocator, world: *const World) void {
     loaded.deinit(gpa);
+    world.getResourcePtr(Map).?.deinit(gpa);
 }
 
 pub fn resetState() void {
@@ -132,6 +132,7 @@ pub fn hoe(position: zhu.Vector2) bool {
 }
 
 fn canHoeTile(position: zhu.Vector2) bool {
+    const grid = loaded.land.grid;
     const index = grid.worldToIndex(position) orelse return false;
     const marks = loaded.land.tiles[index].marks;
     if (!marks.contains(.arable)) return false;
@@ -159,12 +160,13 @@ pub fn collision() *const spatial.Static {
 
 // 清除地图上的默认产出对象，并记录为 gone，避免后续恢复时重新生成。
 pub fn clearProduct(world: *World, position: zhu.Vector2) void {
-    clearProductIndex(world, grid.worldToIndex(position).?);
+    clearProductIndex(world, loaded.land.grid.worldToIndex(position).?);
 }
 
 fn saveCurrent(gpa: std.mem.Allocator, world: *const World) void {
     const day = world.getResourcePtr(Clock).?.*.day;
-    const state = ensure(gpa, current, loaded.land.tiles.len, day);
+    const id = world.getResourcePtr(Map).?.id;
+    const state = ensure(gpa, id, loaded.land.tiles.len, day);
     for (loaded.land.tiles, 0..) |tile, index| {
         var saved = &state.tiles[index];
         saved.ground = tile.ground;
@@ -181,7 +183,8 @@ fn saveCurrent(gpa: std.mem.Allocator, world: *const World) void {
 
 fn restoreCurrent(gpa: std.mem.Allocator, world: *World) void {
     const day = world.getResourcePtr(Clock).?.*.day;
-    const state = ensure(gpa, current, loaded.land.tiles.len, day);
+    const id = world.getResourcePtr(Map).?.id;
+    const state = ensure(gpa, id, loaded.land.tiles.len, day);
     advanceState(state, day);
 
     for (state.tiles, 0..) |saved, index| {
@@ -250,7 +253,7 @@ fn restoreObject(world: *World, index: usize, data: Object) void {
     switch (data) {
         .gone => clearProductIndex(world, index),
         .crop => |crop| {
-            const position = grid.indexToWorld(index);
+            const position = loaded.land.grid.indexToWorld(index);
             const entity = factory.spawnCrop(world, position, crop.kind);
             world.getPtr(entity, farm.Crop).?.* = crop;
             refreshCropSprite(world, entity, crop);
@@ -525,7 +528,7 @@ test "恢复已移除的产出对象时只清除它自己的阻挡" {
         .data = &.{},
         .objects = &objects,
     }} });
-    defer unload(gpa);
+    defer unload(gpa, &world);
 
     const entity = world.createEntity();
     world.add(entity, item.Product{ .drop = .one(.stone), .health = 1 });
@@ -611,13 +614,12 @@ test "对象层产出对象按碰撞范围占用格子" {
         .tileSets = &testTileSets,
     };
 
-    grid = testMap.grid;
-    defer grid = maps[@backingInt(current)].grid;
-
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    loaded = loader.load(std.testing.allocator, &world, testMap);
+    var visual = Map{ .grid = testMap.grid };
+    defer visual.deinit(std.testing.allocator);
+    loaded = loader.load(std.testing.allocator, &world, testMap, &visual);
     defer loaded.deinit(std.testing.allocator);
 
     loaded.land.tiles[0].marks.insert(.arable);
@@ -642,10 +644,10 @@ test "canHoeTile 要求可耕作且没有地图阻挡语义" {
     var world = ecs.World.init(gpa);
     defer world.deinit();
     load(gpa, &world, .{ .grid = .{ .width = 10, .height = 12, .cellSide = 16 } });
-    defer grid = maps[@backingInt(current)].grid;
-    defer unload(gpa);
+    defer unload(gpa, &world);
 
     const position = zhu.Vector2.xy(24, 40);
+    const grid = loaded.land.grid;
     const index = grid.worldToIndex(position).?;
 
     try std.testing.expect(!canHoeTile(position));

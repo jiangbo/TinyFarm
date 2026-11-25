@@ -3,7 +3,7 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
-const map = @import("../map.zig");
+const Map = @import("../resource/Map.zig");
 
 const World = ecs.World;
 const Entity = ecs.Entity;
@@ -50,7 +50,7 @@ fn markFacingHits(world: *World) void {
     const pos = world.get(player, Position).?;
     const facing = world.get(player, component.actor.Actor).?.facing;
 
-    const ts = map.grid.cellSize().x; // 当前地图格子大小
+    const ts = world.getResourcePtr(Map).?.grid.cellSize().x;
     const probeSize = ts + 4 * 2;
     const half = probeSize / 2;
     const origin = pos.add(switch (facing) {
@@ -77,6 +77,11 @@ fn targetCenter(world: *const World, entity: Entity) Position {
     return shape.move(position).toRect().center();
 }
 
+const testMap: Map = .{
+    .id = .school,
+    .grid = .{ .width = 3, .height = 3, .cellSide = 16 },
+};
+
 fn addTestPlayer(world: *World, position: Position) Entity {
     const player = world.createIdentity(Player);
     world.add(player, position);
@@ -98,12 +103,9 @@ test "interact 按下交互键会给最近目标挂交互标记" {
     zhu.window.resetInput();
     defer zhu.window.resetInput();
 
-    const oldGrid = map.grid;
-    map.grid = .{ .width = 3, .height = 3, .cellSide = 16 };
-    defer map.grid = oldGrid;
-
     var world = World.init(std.testing.allocator);
     defer world.deinit();
+    world.addResource(testMap);
 
     _ = addTestPlayer(&world, .xy(0, 0));
     const near = addTestNpc(&world, .xy(0, 10));
@@ -121,12 +123,9 @@ test "interact 对话中不会重新寻找目标" {
     zhu.window.resetInput();
     defer zhu.window.resetInput();
 
-    const oldGrid = map.grid;
-    map.grid = .{ .width = 3, .height = 3, .cellSide = 16 };
-    defer map.grid = oldGrid;
-
     var world = World.init(std.testing.allocator);
     defer world.deinit();
+    world.addResource(testMap);
 
     _ = addTestPlayer(&world, .xy(0, 0));
     const talking = addTestNpc(&world, .xy(0, 10));
@@ -157,12 +156,9 @@ test "interact 下一帧会清理上一次交互目标" {
 }
 
 test "interact 玩家紧贴 NPC 上方朝下时探测框能命中" {
-    const oldGrid = map.grid;
-    map.grid = .{ .width = 3, .height = 3, .cellSide = 16 };
-    defer map.grid = oldGrid;
-
     var world = World.init(std.testing.allocator);
     defer world.deinit();
+    world.addResource(testMap);
 
     // 玩家朝下站在 NPC 正上方，两圆相切：NPC 脚底恰在 pos.y+10。
     _ = addTestPlayer(&world, .xy(0, 0));
