@@ -34,19 +34,15 @@ fn frame(delta: f32) void {
 }
 
 fn drawDebug() void {
-    const total = scene.world.entities.versions.items.len;
+    const stats = scene.world.stats();
 
     var entityBuffer: [32]u8 = undefined;
     var componentBuffer: [32]u8 = undefined;
+    const entities = .{ stats.alive, stats.total };
     const rows = [_]zhu.extend.debug.Row{.{
         .label = "世界",
-        .left = zhu.format(&entityBuffer, "实体 {}/{}", .{
-            total - scene.world.entities.deleted.items.len,
-            total,
-        }),
-        .right = zhu.format(&componentBuffer, "组件 {}", .{
-            scene.world.map.count(),
-        }),
+        .left = zhu.format(&entityBuffer, "实体 {}/{}", entities),
+        .right = zhu.format(&componentBuffer, "组件 {}", .{stats.stores}),
     }};
     zhu.extend.debug.enabled = true;
     zhu.extend.debug.draw(.{ .extra = &rows });
