@@ -108,7 +108,11 @@ fn useSeed(world: *World, current: *Map, want: WantUse, kind: CropEnum) void {
     const inv = world.getResourcePtr(Inventory).?;
     if (!inv.use(want.item, 1)) return;
 
-    const crop = factory.spawnCrop(world, want.target, kind);
+    const stage = factory.cropStage(kind, .seed);
+    const crop = factory.spawnCrop(world, want.target, .{
+        .kind = kind,
+        .next = stage.duration,
+    });
     tile.set(.crop, crop);
     world.addEvent(event.SoundPlay{ .id = .plant });
 }

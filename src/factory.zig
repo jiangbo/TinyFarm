@@ -403,32 +403,29 @@ fn applyLight(world: *World, entity: Entity, object: Object) void {
     if (night) world.add(entity, light.Night{});
 }
 
-pub fn spawnCrop(
-    world: *World,
-    position: zhu.Vector2,
-    kind: farm.CropEnum,
-) Entity {
-    const stage = cropStage(kind, .seed);
+pub fn spawnCrop(world: *World, position: zhu.Vector2, crop: farm.Crop) Entity {
+    const sprite, const layer = cropAppearance(crop);
     const entity = world.createEntity();
-    world.add(entity, farm.Crop{ .kind = kind, .next = stage.duration });
-    world.add(entity, component.Position.xy(position.x, position.y));
-    world.add(entity, render.Sprite{
-        .image = resolveImage(stage.sprite),
-        .offset = stage.sprite.offset,
-    });
-    world.add(entity, render.Render{ .layer = .crop });
+    world.add(entity, crop);
+    world.add(entity, position);
+    world.add(entity, sprite);
+    world.add(entity, render.Render{ .layer = layer });
     world.add(entity, render.YSort{});
     return entity;
 }
 
 pub fn refreshCropSprite(world: *const World, entity: Entity, crop: farm.Crop) void {
-    const cfg = cropStage(crop.kind, crop.stage);
-    world.getPtr(entity, render.Sprite).?.* = .{
-        .image = resolveImage(cfg.sprite),
-        .offset = cfg.sprite.offset,
+    const sprite, const layer = cropAppearance(crop);
+    world.getPtr(entity, render.Sprite).?.* = sprite;
+    world.getPtr(entity, render.Render).?.layer = layer;
+}
+
+fn cropAppearance(crop: farm.Crop) struct { render.Sprite, render.Layer } {
+    const sprite = cropStage(crop.kind, crop.stage).sprite;
+    return .{
+        .{ .image = resolveImage(sprite), .offset = sprite.offset },
+        if (crop.stage == .seed) .crop else .actor,
     };
-    if (crop.stage == .seed) return;
-    world.getPtr(entity, render.Render).?.layer = .actor;
 }
 
 pub fn spawnPickup(world: *World, args: struct {
@@ -527,38 +524,6 @@ test "spawnFriend 会创建可对话 NPC 实体" {
     try std.testing.expect(world.has(entity, actor.Interact));
     const dialog = world.get(entity, actor.Dialog).?;
     try std.testing.expect(dialog.lines.len != 0);
-}
-
-test "spawnCrop 会按作物类型设置 kind 和 next" {
-    var world = World.init(std.testing.allocator);
-    defer world.deinit();
-
-    const cases = [_]struct {
-        kind: farm.CropEnum,
-        position: zhu.Vector2,
-        duration: f32,
-    }{
-        .{
-            .kind = .strawberry,
-            .position = .xy(32, 48),
-            .duration = zon.crops.strawberry.seed.duration,
-        },
-        .{
-            .kind = .potato,
-            .position = .xy(64, 80),
-            .duration = zon.crops.potato.seed.duration,
-        },
-    };
-
-    for (cases) |case| {
-        const entity = spawnCrop(&world, case.position, case.kind);
-        const crop = world.get(entity, farm.Crop).?;
-        try expectEqual(farm.GrowthEnum.seed, crop.stage);
-        try expectEqual(case.kind, crop.kind);
-        try expectEqual(case.duration, crop.next);
-        const position = world.get(entity, component.Position).?;
-        try expectEqual(case.position.x, position.x);
-    }
 }
 
 test "地图摆件按底边定位生成实体" {

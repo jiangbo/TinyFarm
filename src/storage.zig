@@ -301,9 +301,7 @@ fn restoreObject(map: *MapResource, world: *World, index: usize, data: Object) v
         },
         .crop => |crop| {
             const position = map.grid.indexToWorld(index);
-            const entity = factory.spawnCrop(world, position, crop.kind);
-            world.getPtr(entity, farm.Crop).?.* = crop;
-            factory.refreshCropSprite(world, entity, crop);
+            const entity = factory.spawnCrop(world, position, crop);
             map.tiles[index].set(.crop, entity);
         },
         .chest => |saved| {
