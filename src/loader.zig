@@ -64,6 +64,26 @@ pub fn load(gpa: std.mem.Allocator, world: *World, id: Id) Map {
     const index = spatial.StaticIndex.build(gpa, grid, loaded.areas.items);
     loaded.collision.index = index catch zhu.oom();
     loaded.collision.bounds = .init(.zero, grid.size());
+
+    // 原始地图没有住宅室外与城镇的连接，由游戏补充。
+    const trigger: ?Trigger = switch (id) {
+        .home_exterior => .{
+            .rect = .init(.xy(552, 227), .xy(7, 25)),
+            .selfId = 2,
+            .targetId = 2,
+            .targetMap = .town,
+            .startOffset = .left,
+        },
+        .town => .{
+            .rect = .init(.xy(1, 227), .xy(7, 25)),
+            .selfId = 2,
+            .targetId = 2,
+            .targetMap = .home_exterior,
+            .startOffset = .right,
+        },
+        else => null,
+    };
+    if (trigger) |value| _ = factory.spawnMapTrigger(world, value);
     return loaded;
 }
 

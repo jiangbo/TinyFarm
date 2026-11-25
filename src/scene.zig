@@ -4,7 +4,7 @@ const ecs = @import("ecs");
 
 const component = @import("component.zig");
 const factory = @import("factory.zig");
-const map = @import("map.zig");
+const loader = @import("loader.zig");
 const render = @import("render.zig");
 const save = @import("save.zig");
 const system = @import("system/system.zig");
@@ -14,6 +14,7 @@ const ui = @import("ui/ui.zig");
 const resource = struct {
     const Clock = @import("resource/Clock.zig");
     const Inventory = @import("resource/Inventory.zig");
+    const Map = @import("resource/Map.zig");
     const Notice = @import("resource/Notice.zig");
     const Settings = @import("resource/Settings.zig");
 };
@@ -51,7 +52,7 @@ pub fn init(allocator_: std.mem.Allocator) void {
 
 pub fn deinit() void {
     render.deinit();
-    map.unload(allocator, &world);
+    unloadMap();
     save.deinit(allocator);
     ui.deinit();
     world.deinit();
@@ -138,9 +139,8 @@ fn updateMapFade(delta: f32) bool {
         .covered => {
             const playerEntity = world.getIdentity(actor.Player).?;
             const request = world.get(playerEntity, Transition).?;
-            map.exit(allocator, &world);
-            resetWorld();
-            map.enter(allocator, &world, request.target);
+            exitMap();
+            enterMap(request.target);
             spawnPlayer(request.targetId);
             system.light.update(&world);
             system.sort.update(&world);
@@ -158,8 +158,7 @@ fn applyScene() void {
         .title => title.exit(),
         .play => {
             mapFade = .init(0.15);
-            map.exit(allocator, &world);
-            resetWorld();
+            exitMap();
         },
     }
     current, pending = .{ next, null };
@@ -195,7 +194,7 @@ fn enterPlay(loadSlot: ?u8) void {
     save.resetMaps();
 
     resetWorld();
-    map.enter(allocator, &world, .home_exterior);
+    enterMap(.home_exterior);
     spawnPlayer(-1);
     system.light.update(&world);
     system.sort.update(&world);
@@ -226,19 +225,38 @@ fn load(slot: u8) bool {
     defer record.deinit();
 
     const player = record.value.player;
-    map.unload(allocator, &world);
+    unloadMap();
     save.restore(allocator, &world, record.value);
     world.getResourcePtr(resource.Notice).?.reset();
     world.getResourcePtr(resource.Settings).?.lightOn = false;
 
     resetWorld();
-    map.enter(allocator, &world, player.map);
+    enterMap(player.map);
     factory.spawnPlayer(&world, player.position, player.facing);
     zhu.camera.directFollow(player.position);
     system.light.update(&world);
     system.sort.update(&world);
     ui.resetInventory();
     return true;
+}
+
+fn enterMap(id: component.map.Id) void {
+    var loaded = loader.load(allocator, &world, id);
+    save.applyMap(allocator, &world, &loaded);
+    world.addResource(loaded);
+    zhu.camera.bound = loaded.grid.size();
+}
+
+fn exitMap() void {
+    save.captureMap(allocator, &world);
+    unloadMap();
+    resetWorld();
+}
+
+fn unloadMap() void {
+    const loaded = world.getResourcePtr(resource.Map) orelse return;
+    loaded.deinit(allocator);
+    world.removeResource(resource.Map);
 }
 
 fn spawnPlayer(targetId: i32) void {
