@@ -3,7 +3,7 @@ const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 const component = @import("../component.zig");
-const map = @import("../map.zig");
+const Map = @import("../resource/Map.zig");
 
 const spatial = zhu.extend.spatial;
 const Position = component.Position;
@@ -15,11 +15,7 @@ const World = ecs.World;
 const Entity = ecs.Entity;
 
 pub fn update(world: *const World, delta: f32) void {
-    move(world, map.collision(), delta);
-    followPlayer(world, delta);
-}
-
-fn move(world: *const World, collision: *const spatial.Static, delta: f32) void {
+    const collision = &world.getResourcePtr(Map).?.collision;
     var query = world.query(.{ Position, Velocity });
     while (query.next()) |row| {
         const velocity = row.get(Velocity);
@@ -29,6 +25,8 @@ fn move(world: *const World, collision: *const spatial.Static, delta: f32) void 
         const offset = velocity.value.scale(delta);
         pos.* = pos.add(slide(world, collision, row.entity, offset));
     }
+
+    followPlayer(world, delta);
 }
 
 // 合并静态碰撞与动态实体的碰撞，计算滑墙后的实际位移。
@@ -68,6 +66,7 @@ fn followPlayer(world: *const World, delta: f32) void {
 test "有碰撞形状的实体只有带 Blocking 才阻挡移动" {
     var world = World.init(std.testing.allocator);
     defer world.deinit();
+    world.addResource(Map{ .id = .school });
 
     const shape: Shape = .{ .rect = .init(.zero, .xy(10, 10)) };
     const mover = world.createEntity();
@@ -80,11 +79,11 @@ test "有碰撞形状的实体只有带 Blocking 才阻挡移动" {
     world.add(obstacle, Position.xy(10, 0));
     world.add(obstacle, shape);
 
-    move(&world, &.{}, 0.5);
+    update(&world, 0.5);
     try std.testing.expectEqual(Position.xy(10, 5), world.get(mover, Position).?);
 
     world.getPtr(mover, Position).?.* = .zero;
     world.add(obstacle, Blocking{});
-    move(&world, &.{}, 0.5);
+    update(&world, 0.5);
     try std.testing.expectEqual(Position.xy(0, 5), world.get(mover, Position).?);
 }

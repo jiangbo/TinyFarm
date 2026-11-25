@@ -16,38 +16,14 @@ const motion = component.motion;
 const Trigger = component.map.Trigger;
 const SolidRange = component.map.SolidRange;
 
-pub const Loaded = struct {
-    collision: spatial.Static = .{},
-    areas: std.ArrayList(zhu.Rect) = .empty,
-    loaded: bool = false,
-
-    pub fn deinit(self: *Loaded, gpa: std.mem.Allocator) void {
-        if (!self.loaded) return;
-        self.collision.deinit(gpa);
-        self.areas.clearAndFree(gpa);
-        self.loaded = false;
-    }
-
-    fn addSolidRect(self: *Loaded, gpa: std.mem.Allocator, rect: zhu.Rect) void {
-        std.debug.assert(rect.size.x > 0 and rect.size.y > 0);
-        self.areas.append(gpa, rect) catch zhu.oom();
-    }
-
-    // SolidRange 只记录对象加入 areas 时的起点和数量。
-    pub fn solidAreas(self: Loaded, range: SolidRange) []zhu.Rect {
-        return self.areas.items[range.start..][0..range.count];
-    }
-};
-
 const Context = struct {
     gpa: std.mem.Allocator,
     map: tiled.Map,
     world: *World,
-    loaded: *Loaded,
     current: *Map,
 };
 
-pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map, out: *Map) Loaded {
+pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map, out: *Map) void {
     const grid = map.grid;
     if (map.getClass("ambient")) |ambient| {
         out.props.indoorAmbient = .fromFloat(.{
@@ -57,8 +33,7 @@ pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map, out: *Map) Lo
             .a = 1,
         });
     }
-    var result: Loaded = .{};
-    result.collision.mask = spatial.SolidMask.init(gpa, .{
+    out.collision.mask = spatial.SolidMask.init(gpa, .{
         .width = grid.width * 2,
         .height = grid.height * 2,
         .cellSide = @divExact(grid.cellSide, 2),
@@ -68,16 +43,13 @@ pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map, out: *Map) Lo
         .gpa = gpa,
         .map = map,
         .world = world,
-        .loaded = &result,
         .current = out,
     };
     parseLayers(&ctx);
     // 建表后不再追加矩形，销毁物件只需将对应矩形置空。
-    const index = spatial.StaticIndex.build(gpa, grid, result.areas.items);
-    result.collision.index = index catch zhu.oom();
-    result.collision.bounds = .init(.zero, grid.size());
-    result.loaded = true;
-    return result;
+    const index = spatial.StaticIndex.build(gpa, grid, out.areas.items);
+    out.collision.index = index catch zhu.oom();
+    out.collision.bounds = .init(.zero, grid.size());
 }
 
 fn parseLayers(ctx: *Context) void {
@@ -109,7 +81,7 @@ fn parseLayers(ctx: *Context) void {
 }
 
 fn parseSolidLayer(ctx: *Context, layer: *const tiled.Layer) void {
-    const collision = &ctx.loaded.collision;
+    const collision = &ctx.current.collision;
     for (layer.data, 0..) |gid, index| {
         if (gid != 0) collision.setCellsInRect(ctx.map.grid.indexToRect(index));
     }
@@ -143,8 +115,8 @@ fn loadRockTile(ctx: *Context, globalId: u32, index: usize) void {
         ctx.map, globalId, index);
     if (!ctx.world.has(entity, item.Product)) return;
 
-    const start = ctx.loaded.areas.items.len;
-    ctx.loaded.addSolidRect(ctx.gpa, ctx.map.grid.indexToRect(index));
+    const start = ctx.current.areas.items.len;
+    ctx.current.addSolidRect(ctx.gpa, ctx.map.grid.indexToRect(index));
     ctx.world.add(entity, SolidRange{ .start = start, .count = 1 });
     ctx.current.tiles[index].set(.product, entity);
 }
@@ -188,7 +160,7 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
                 continue;
             },
         };
-        ctx.loaded.collision.setCellsInRect(rect);
+        ctx.current.collision.setCellsInRect(rect);
     }
 }
 
@@ -201,7 +173,7 @@ fn parseImageLayer(ctx: *Context, layer: *const tiled.Layer) void {
 fn parseObjectLayer(ctx: *Context, layer: *const tiled.Layer) void {
     if (layer.isNamed("collider")) {
         for (layer.objects) |object| {
-            ctx.loaded.addSolidRect(ctx.gpa, object.rect());
+            ctx.current.addSolidRect(ctx.gpa, object.rect());
         }
         return;
     }
@@ -293,7 +265,7 @@ fn loadProp(ctx: *Context, object: tiled.Object) void {
     if (ctx.world.has(entity, item.Product)) {
         if (solid.count != 0) {
             // 树这类对象按碰撞范围登记，不按更大的显示范围登记。
-            for (ctx.loaded.solidAreas(solid)) |area| {
+            for (ctx.current.solidAreas(solid)) |area| {
                 setProductTiles(ctx, entity, area);
             }
         } else {
@@ -306,7 +278,7 @@ fn loadProp(ctx: *Context, object: tiled.Object) void {
 }
 
 fn addSolidObject(ctx: *Context, object: tiled.Object) SolidRange {
-    const start = ctx.loaded.areas.items.len;
+    const start = ctx.current.areas.items.len;
     const tile = ctx.map.getTile(object.gid) orelse
         return .{ .start = start, .count = 0 };
     const group = tile.objectGroup orelse
@@ -315,14 +287,14 @@ fn addSolidObject(ctx: *Context, object: tiled.Object) SolidRange {
 
     for (group.objects) |local| {
         const position = topLeft.add(local.position);
-        ctx.loaded.addSolidRect(
+        ctx.current.addSolidRect(
             ctx.gpa,
             zhu.Rect.init(position, local.size),
         );
     }
     return .{
         .start = start,
-        .count = ctx.loaded.areas.items.len - start,
+        .count = ctx.current.areas.items.len - start,
     };
 }
 

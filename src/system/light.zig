@@ -81,7 +81,7 @@ test "随身灯遵守手动开关、室内外和昼夜边界" {
     defer world.deinit();
     world.addResource(Clock{});
     world.addResource(Settings{});
-    world.addResource(Map{});
+    world.addResource(Map{ .id = .school });
     const player = world.createIdentity(component.actor.Player);
 
     const Case = struct { outdoor: bool, hour: u8, on: bool, enabled: bool };

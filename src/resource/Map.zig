@@ -7,8 +7,10 @@ const component = @import("../component.zig");
 const Map = @This();
 const Allocator = std.mem.Allocator;
 const Entity = ecs.Entity;
-const Grid = zhu.extend.spatial.Grid;
+const spatial = zhu.extend.spatial;
+const Grid = spatial.Grid;
 const farm = component.farm;
+const SolidRange = component.map.SolidRange;
 const AnimatedTile = struct { vertex: usize, animation: zhu.Animation };
 
 const TileObject = struct {
@@ -49,6 +51,8 @@ props: struct {
     indoorAmbient: zhu.Color = .white,
 } = .{},
 tiles: []Tile = &.{},
+collision: spatial.Static = .{},
+areas: std.ArrayList(zhu.Rect) = .empty,
 vertexes: std.ArrayList(zhu.Vertex) = .empty,
 animatedTiles: std.ArrayList(AnimatedTile) = .empty,
 frontStart: usize = 0,
@@ -62,6 +66,8 @@ pub fn init(gpa: Allocator, grid: Grid) Map {
 pub fn deinit(self: *Map, gpa: Allocator) void {
     gpa.free(self.tiles);
     self.tiles = &.{};
+    self.collision.deinit(gpa);
+    self.areas.clearAndFree(gpa);
     self.vertexes.clearAndFree(gpa);
     self.animatedTiles.clearAndFree(gpa);
     self.frontStart = 0;
@@ -125,6 +131,16 @@ fn appendGroundVertex(position: zhu.Vector2, image: zhu.Image) void {
         .size = image.size,
         .uvRect = image.uvRect(),
     });
+}
+
+pub fn addSolidRect(self: *Map, gpa: std.mem.Allocator, rect: zhu.Rect) void {
+    std.debug.assert(rect.size.x > 0 and rect.size.y > 0);
+    self.areas.append(gpa, rect) catch zhu.oom();
+}
+
+// SolidRange 只记录对象加入 areas 时的起点和数量。
+pub fn solidAreas(self: *const Map, range: SolidRange) []zhu.Rect {
+    return self.areas.items[range.start..][0..range.count];
 }
 
 pub fn getTile(self: *const Map, position: zhu.Vector2) ?*Tile {

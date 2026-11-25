@@ -32,11 +32,10 @@ const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
     @import("zon/maps/home_interior.zon"),
 });
 
-var loaded: loader.Loaded = .{};
 var states: std.EnumArray(Id, SaveMap) = .initFill(.{});
 
 pub fn deinit(gpa: std.mem.Allocator, world: *const World) void {
-    if (loaded.loaded) exit(gpa, world);
+    unload(gpa, world);
     for (std.enums.values(Id)) |id| {
         gpa.free(states.get(id).tiles);
     }
@@ -81,12 +80,12 @@ pub fn exit(gpa: std.mem.Allocator, world: *const World) void {
 pub fn load(gpa: std.mem.Allocator, world: *World, mapData: tiled.Map) void {
     world.addResource(Map.init(gpa, mapData.grid));
     zhu.camera.bound = mapData.grid.size();
-    loaded = loader.load(gpa, world, mapData, world.getResourcePtr(Map).?);
+    loader.load(gpa, world, mapData, world.getResourcePtr(Map).?);
 }
 
 pub fn unload(gpa: std.mem.Allocator, world: *const World) void {
-    loaded.deinit(gpa);
-    world.getResourcePtr(Map).?.deinit(gpa);
+    const current = world.getResourcePtr(Map) orelse return;
+    current.deinit(gpa);
 }
 
 pub fn resetState() void {
@@ -130,13 +129,9 @@ pub fn hoe(current: *Map, position: zhu.Vector2) bool {
     if (marks.contains(.water)) return false;
     if (marks.contains(.occupied)) return false;
     const body: zhu.Shape = .{ .rect = current.grid.indexToRect(index) };
-    if (loaded.collision.overlaps(body)) return false;
+    if (current.collision.overlaps(body)) return false;
     tile.ground = .dry;
     return true;
-}
-
-pub fn collision() *const spatial.Static {
-    return &loaded.collision;
 }
 
 // 清除地图上的默认产出对象，并记录为 gone，避免后续恢复时重新生成。
@@ -271,7 +266,7 @@ fn clearProductIndex(world: *World, current: *Map, index: usize) void {
     const object = current.tiles[index].object.?;
     std.debug.assert(object.kind == .product);
     if (world.get(object.entity, component.map.SolidRange)) |range| {
-        for (loaded.solidAreas(range)) |*area| area.* = .init(.zero, .zero);
+        for (current.solidAreas(range)) |*area| area.* = .init(.zero, .zero);
     }
     world.destroyEntity(object.entity);
     clearProductTiles(current.tiles, object.entity);
@@ -524,16 +519,16 @@ test "恢复已移除的产出对象时只清除它自己的阻挡" {
 
     const productArea: zhu.Shape = .{ .rect = .init(.xy(5, 1), .one) };
     const neighborArea: zhu.Shape = .{ .rect = .init(.xy(9, 1), .one) };
-    try std.testing.expect(loaded.collision.overlaps(productArea));
-    try std.testing.expect(loaded.collision.overlaps(neighborArea));
+    try std.testing.expect(current.collision.overlaps(productArea));
+    try std.testing.expect(current.collision.overlaps(neighborArea));
 
     restoreObject(&world, 0, .gone);
 
     try std.testing.expectEqual(null, current.tiles[0].object);
     try std.testing.expectEqual(.product, current.tiles[0].gone);
     try std.testing.expect(!world.has(entity, item.Product));
-    try std.testing.expect(!loaded.collision.overlaps(productArea));
-    try std.testing.expect(loaded.collision.overlaps(neighborArea));
+    try std.testing.expect(!current.collision.overlaps(productArea));
+    try std.testing.expect(current.collision.overlaps(neighborArea));
 }
 
 test "对象层产出对象按碰撞范围占用格子" {
@@ -607,8 +602,7 @@ test "对象层产出对象按碰撞范围占用格子" {
     world.addResource(Map.init(std.testing.allocator, testMap.grid));
     const current = world.getResourcePtr(Map).?;
     defer current.deinit(std.testing.allocator);
-    loaded = loader.load(std.testing.allocator, &world, testMap, current);
-    defer loaded.deinit(std.testing.allocator);
+    loader.load(std.testing.allocator, &world, testMap, current);
 
     current.tiles[0].marks.insert(.arable);
     current.tiles[1].marks.insert(.arable);
@@ -661,6 +655,6 @@ test "锄地要求可耕作且没有地图阻挡语义" {
     try std.testing.expect(!hoe(current, position));
     tile.marks.remove(.occupied);
 
-    loaded.collision.setCellsInRect(grid.indexToRect(index));
+    current.collision.setCellsInRect(grid.indexToRect(index));
     try std.testing.expect(!hoe(current, position));
 }
