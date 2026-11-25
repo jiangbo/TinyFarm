@@ -4,8 +4,8 @@ const ecs = @import("ecs");
 
 const component = @import("component.zig");
 const factory = @import("factory.zig");
-const loader = @import("map/loader.zig");
-const storage = @import("storage.zig");
+const loader = @import("loader.zig");
+const save = @import("save.zig");
 const Map = @import("resource/Map.zig");
 
 const World = ecs.World;
@@ -13,7 +13,7 @@ const Id = component.map.Id;
 
 pub fn enter(gpa: std.mem.Allocator, world: *World, id: Id) void {
     var current = loader.load(gpa, world, id);
-    storage.applyMap(gpa, world, &current);
+    save.applyMap(gpa, world, &current);
     world.addResource(current);
     zhu.camera.bound = current.grid.size();
 
@@ -39,7 +39,7 @@ pub fn enter(gpa: std.mem.Allocator, world: *World, id: Id) void {
 }
 
 pub fn exit(gpa: std.mem.Allocator, world: *World) void {
-    storage.captureMap(gpa, world);
+    save.captureMap(gpa, world);
     unload(gpa, world);
 }
 

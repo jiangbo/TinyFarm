@@ -2,9 +2,9 @@ const std = @import("std");
 const zhu = @import("zhu");
 const ecs = @import("ecs");
 
-const component = @import("../component.zig");
-const factory = @import("../factory.zig");
-const Map = @import("../resource/Map.zig");
+const component = @import("component.zig");
+const factory = @import("factory.zig");
+const Map = @import("resource/Map.zig");
 
 const tiled = zhu.extend.tiled;
 const spatial = zhu.extend.spatial;
@@ -17,11 +17,11 @@ const Id = component.map.Id;
 const Trigger = component.map.Trigger;
 const SolidRange = component.map.SolidRange;
 
-const maps = tiled.bind(@import("../zon/tileSet.zon"), &.{
-    @import("../zon/maps/school.zon"),
-    @import("../zon/maps/town.zon"),
-    @import("../zon/maps/home_exterior.zon"),
-    @import("../zon/maps/home_interior.zon"),
+const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
+    @import("zon/maps/school.zon"),
+    @import("zon/maps/town.zon"),
+    @import("zon/maps/home_exterior.zon"),
+    @import("zon/maps/home_interior.zon"),
 });
 
 pub fn definition(id: Id) *const tiled.Map {

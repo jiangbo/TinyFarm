@@ -6,7 +6,7 @@ const component = @import("component.zig");
 const factory = @import("factory.zig");
 const map = @import("map.zig");
 const render = @import("render.zig");
-const storage = @import("storage.zig");
+const save = @import("save.zig");
 const system = @import("system/system.zig");
 const title = @import("title.zig");
 const ui = @import("ui/ui.zig");
@@ -42,8 +42,8 @@ pub fn init(allocator_: std.mem.Allocator) void {
     world.addResource(resource.Settings.load());
 
     // 存档状态先就位，UI 只持有这份长期有效的槽位切片。
-    storage.init();
-    ui.init(&storage.slots);
+    save.init();
+    ui.init(&save.slots);
     title.init();
     render.init();
     enterScene(current);
@@ -52,7 +52,7 @@ pub fn init(allocator_: std.mem.Allocator) void {
 pub fn deinit() void {
     render.deinit();
     map.unload(allocator, &world);
-    storage.deinit(allocator);
+    save.deinit(allocator);
     ui.deinit();
     world.deinit();
 }
@@ -98,7 +98,7 @@ fn updatePlayUi(req: ui.Request) void {
         .block => {},
         .title => pending = .title,
         .save => |slot| {
-            if (!save(slot)) {
+            if (!saveSlot(slot)) {
                 ui.showMessage(.{ .text = "保存失败", .fail = true });
                 return;
             }
@@ -192,7 +192,7 @@ fn enterPlay(loadSlot: ?u8) void {
     clock.reset();
     world.getResourcePtr(resource.Notice).?.reset();
     world.getResourcePtr(resource.Settings).?.lightOn = false;
-    storage.resetMaps();
+    save.resetMaps();
 
     resetWorld();
     map.enter(allocator, &world, .home_exterior);
@@ -210,8 +210,8 @@ fn enterPlay(loadSlot: ?u8) void {
     zhu.music.play("audio/01_spring_journey.ogg");
 }
 
-fn save(slot: u8) bool {
-    storage.save(allocator, &world, slot) catch |err| {
+fn saveSlot(slot: u8) bool {
+    save.write(allocator, &world, slot) catch |err| {
         std.log.err("save slot {} failed: {}", .{ slot, err });
         return false;
     };
@@ -219,7 +219,7 @@ fn save(slot: u8) bool {
 }
 
 fn load(slot: u8) bool {
-    var record = storage.read(slot) catch |err| {
+    var record = save.read(slot) catch |err| {
         std.log.err("load slot {} failed: {}", .{ slot, err });
         return false;
     };
@@ -227,7 +227,7 @@ fn load(slot: u8) bool {
 
     const player = record.value.player;
     map.unload(allocator, &world);
-    storage.restore(allocator, &world, record.value);
+    save.restore(allocator, &world, record.value);
     world.getResourcePtr(resource.Notice).?.reset();
     world.getResourcePtr(resource.Settings).?.lightOn = false;
 

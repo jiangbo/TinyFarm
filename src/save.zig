@@ -8,7 +8,7 @@ const Inventory = @import("resource/Inventory.zig");
 const MapResource = @import("resource/Map.zig");
 const Settings = @import("resource/Settings.zig");
 const factory = @import("factory.zig");
-const loader = @import("map/loader.zig");
+const loader = @import("loader.zig");
 
 const World = ecs.World;
 const MapId = component.map.Id;
@@ -88,7 +88,7 @@ pub fn read(slot: u8) !zhu.storage.Loaded(Record) {
     return record;
 }
 
-pub fn save(gpa: std.mem.Allocator, world: *const World, slot: u8) !void {
+pub fn write(gpa: std.mem.Allocator, world: *const World, slot: u8) !void {
     const record = capture(gpa, world);
     defer record.maps.deinit(gpa);
 
