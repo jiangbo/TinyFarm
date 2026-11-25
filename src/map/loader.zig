@@ -28,7 +28,7 @@ pub const Loaded = struct {
     frontStart: usize = 0,
     loaded: bool = false,
 
-    pub fn deinit(self: *Loaded, gpa: zhu.Allocator) void {
+    pub fn deinit(self: *Loaded, gpa: std.mem.Allocator) void {
         if (!self.loaded) return;
         self.land.deinit(gpa);
         self.collision.deinit(gpa);
@@ -47,7 +47,7 @@ pub const Loaded = struct {
         }
     }
 
-    fn addSolidRect(self: *Loaded, gpa: zhu.Allocator, rect: zhu.Rect) void {
+    fn addSolidRect(self: *Loaded, gpa: std.mem.Allocator, rect: zhu.Rect) void {
         std.debug.assert(rect.size.x > 0 and rect.size.y > 0);
         self.areas.append(gpa, rect) catch zhu.oom();
     }
@@ -59,13 +59,13 @@ pub const Loaded = struct {
 };
 
 const Context = struct {
-    gpa: zhu.Allocator,
+    gpa: std.mem.Allocator,
     map: tiled.Map,
     world: *World,
     loaded: *Loaded,
 };
 
-pub fn load(gpa: zhu.Allocator, world: *World, map: tiled.Map) Loaded {
+pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map) Loaded {
     const grid = map.grid;
     var result: Loaded = .{ .land = Land.init(gpa, grid) };
     result.collision.mask = spatial.SolidMask.init(gpa, .{

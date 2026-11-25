@@ -42,7 +42,7 @@ pub const Map = struct {
 pub const MapRecord = struct {
     maps: std.EnumArray(component.map.Id, Map) = .initFill(.{}),
 
-    pub fn deinit(self: MapRecord, gpa: zhu.Allocator) void {
+    pub fn deinit(self: MapRecord, gpa: std.mem.Allocator) void {
         for (std.enums.values(component.map.Id)) |id| {
             gpa.free(self.maps.get(id).tiles);
         }

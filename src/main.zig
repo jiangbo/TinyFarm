@@ -7,7 +7,7 @@ var commandBuffer: [64]zhu.batch.Command = undefined;
 var soundBuffer: [20]zhu.audio.Sound = undefined;
 var debug = false;
 
-pub fn init(allocator: zhu.Allocator) void {
+fn init(allocator: std.mem.Allocator) void {
     zhu.camera.snap = true;
     _ = zhu.loadAtlas(@import("zon/atlas.zon"), .{});
     zhu.batch.init(&commandBuffer, zhu.getImage("circle.png").?);
@@ -23,7 +23,7 @@ pub fn init(allocator: zhu.Allocator) void {
     scene.init(allocator);
 }
 
-pub fn frame(delta: f32) void {
+fn frame(delta: f32) void {
     if (zhu.key.released(.X)) debug = !debug;
 
     scene.update(delta);
@@ -52,7 +52,7 @@ fn drawDebug() void {
     zhu.extend.debug.draw(.{ .extra = &rows });
 }
 
-pub fn deinit(_: zhu.Allocator) void {
+fn deinit(_: std.mem.Allocator) void {
     scene.deinit();
     zhu.audio.deinit();
 }
@@ -62,6 +62,9 @@ pub fn main(initInfo: std.process.Init) void {
     zhu.window.run("迷你农场", .xy(1280, 720), .{
         .logicSize = .xy(640, 360),
         .scaleEnum = .fit,
+        .init = init,
+        .frame = frame,
+        .deinit = deinit,
     });
 }
 

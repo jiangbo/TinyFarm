@@ -51,14 +51,14 @@ pub fn init() void {
     wetLandImage = landImage.sub(.init(.xy(192, 48), .xy(16, 16)));
 }
 
-pub fn deinit(gpa: zhu.Allocator, world: *const World) void {
+pub fn deinit(gpa: std.mem.Allocator, world: *const World) void {
     if (loaded.loaded) exit(gpa, world);
     for (std.enums.values(Id)) |id| {
         gpa.free(states.get(id).tiles);
     }
 }
 
-pub fn enter(gpa: zhu.Allocator, world: *World, id: Id) void {
+pub fn enter(gpa: std.mem.Allocator, world: *World, id: Id) void {
     current = id;
     world.getResourcePtr(Map).?.outdoor = switch (id) {
         .town, .home_exterior => true,
@@ -106,18 +106,18 @@ pub fn update(world: *const World, delta: f32) void {
     }
 }
 
-pub fn exit(gpa: zhu.Allocator, world: *const World) void {
+pub fn exit(gpa: std.mem.Allocator, world: *const World) void {
     saveCurrent(gpa, world);
     unload(gpa);
 }
 
-pub fn load(gpa: zhu.Allocator, world: *World, mapData: tiled.Map) void {
+pub fn load(gpa: std.mem.Allocator, world: *World, mapData: tiled.Map) void {
     grid = mapData.grid;
     zhu.camera.bound = grid.size();
     loaded = loader.load(gpa, world, mapData);
 }
 
-pub fn unload(gpa: zhu.Allocator) void {
+pub fn unload(gpa: std.mem.Allocator) void {
     loaded.deinit(gpa);
 }
 
@@ -131,7 +131,7 @@ pub fn resetState() void {
     }
 }
 
-pub fn capture(gpa: zhu.Allocator, world: *const World) storage.MapRecord {
+pub fn capture(gpa: std.mem.Allocator, world: *const World) storage.MapRecord {
     saveCurrent(gpa, world);
     var result: storage.MapRecord = .{};
 
@@ -146,7 +146,7 @@ pub fn capture(gpa: zhu.Allocator, world: *const World) storage.MapRecord {
     return result;
 }
 
-pub fn restore(gpa: zhu.Allocator, saved: storage.MapRecord, day: u32) void {
+pub fn restore(gpa: std.mem.Allocator, saved: storage.MapRecord, day: u32) void {
     resetState();
     for (std.enums.values(Id)) |id| {
         restoreMap(gpa, id, saved.maps.get(id), day);
@@ -206,7 +206,7 @@ pub fn clearProduct(world: *World, position: zhu.Vector2) void {
     clearProductIndex(world, grid.worldToIndex(position).?);
 }
 
-fn saveCurrent(gpa: zhu.Allocator, world: *const World) void {
+fn saveCurrent(gpa: std.mem.Allocator, world: *const World) void {
     const day = world.getResourcePtr(Clock).?.*.day;
     const state = ensure(gpa, current, loaded.land.tiles.len, day);
     for (loaded.land.tiles, 0..) |tile, index| {
@@ -223,7 +223,7 @@ fn saveCurrent(gpa: zhu.Allocator, world: *const World) void {
     state.day = day;
 }
 
-fn restoreCurrent(gpa: zhu.Allocator, world: *World) void {
+fn restoreCurrent(gpa: std.mem.Allocator, world: *World) void {
     const day = world.getResourcePtr(Clock).?.*.day;
     const state = ensure(gpa, current, loaded.land.tiles.len, day);
     advanceState(state, day);
@@ -239,7 +239,7 @@ fn restoreCurrent(gpa: zhu.Allocator, world: *World) void {
     state.day = day;
 }
 
-fn ensure(gpa: zhu.Allocator, id: Id, count: usize, day: u32) *SaveMap {
+fn ensure(gpa: std.mem.Allocator, id: Id, count: usize, day: u32) *SaveMap {
     const entry = states.getPtr(id);
     if (entry.tiles.len != 0) return entry;
 
@@ -251,7 +251,7 @@ fn ensure(gpa: zhu.Allocator, id: Id, count: usize, day: u32) *SaveMap {
     return entry;
 }
 
-fn captureTiles(gpa: zhu.Allocator, state: *const SaveMap) []Tile {
+fn captureTiles(gpa: std.mem.Allocator, state: *const SaveMap) []Tile {
     var list: std.ArrayList(Tile) = .empty;
 
     if (state.tiles.len == 0) return &.{};
@@ -264,7 +264,7 @@ fn captureTiles(gpa: zhu.Allocator, state: *const SaveMap) []Tile {
     return list.toOwnedSlice(gpa) catch zhu.oom();
 }
 
-fn restoreMap(gpa: zhu.Allocator, id: Id, saved: SaveMap, day: u32) void {
+fn restoreMap(gpa: std.mem.Allocator, id: Id, saved: SaveMap, day: u32) void {
     const mapData = &maps[@backingInt(id)];
     const count = mapData.grid.count();
     const state = ensure(gpa, id, count, day);

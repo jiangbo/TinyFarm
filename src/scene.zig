@@ -29,12 +29,12 @@ const Trigger = component.map.Trigger;
 const Scene = union(enum) { title, play: ?u8 };
 
 pub var world: World = undefined;
-var allocator: zhu.Allocator = undefined;
+var allocator: std.mem.Allocator = undefined;
 var mapFade: zhu.widget.Fade = .init(0.15);
 var current: Scene = .title;
 var pending: ?Scene = null;
 
-pub fn init(allocator_: zhu.Allocator) void {
+pub fn init(allocator_: std.mem.Allocator) void {
     allocator = allocator_;
 
     world = World.init(allocator);

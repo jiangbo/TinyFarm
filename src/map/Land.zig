@@ -43,14 +43,14 @@ pub const Tile = struct {
     }
 };
 
-pub fn init(gpa: zhu.Allocator, grid: Grid) Land {
+pub fn init(gpa: std.mem.Allocator, grid: Grid) Land {
     var self = Land{ .grid = grid };
     self.tiles = gpa.alloc(Tile, grid.count()) catch zhu.oom();
     @memset(self.tiles, .{});
     return self;
 }
 
-pub fn deinit(self: *Land, gpa: zhu.Allocator) void {
+pub fn deinit(self: *Land, gpa: std.mem.Allocator) void {
     gpa.free(self.tiles);
 }
 
