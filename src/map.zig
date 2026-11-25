@@ -19,7 +19,6 @@ const render = component.render;
 const farm = component.farm;
 const item = component.item;
 const motion = component.motion;
-const Position = component.Position;
 const Object = storage.Object;
 const Tile = storage.Tile;
 const SaveMap = storage.Map;
@@ -180,25 +179,8 @@ pub fn getTile(position: zhu.Vector2) ?*Land.Tile {
     return loaded.land.getTile(position);
 }
 
-/// 按地形、对象矩形、动态阻挡实体和地图边界做连续 2D 滑墙移动，返回实际位移。
-pub fn slide(world: *const World, entity: Entity, delta: zhu.Vector2) zhu.Vector2 {
-    const position = world.get(entity, Position).?;
-    const body = world.get(entity, motion.Shape).?.move(position);
-    var s = spatial.Slide.init(body, delta);
-    while (s.next()) |step| {
-        var best = loaded.collision.sweep(step.body, step.move);
-
-        var query = world.query(.{ Position, motion.Shape, motion.Blocking });
-        while (query.next()) |row| {
-            if (row.entity == entity) continue;
-            const other = row.get(motion.Shape).move(row.get(Position));
-            if (step.body.sweep(other, step.move)) |hit| {
-                spatial.Contact.record(&best, hit);
-            }
-        }
-        s.advance(best);
-    }
-    return s.moved;
+pub fn collision() *const spatial.Static {
+    return &loaded.collision;
 }
 
 // 清除地图上的默认产出对象，并记录为 gone，避免后续恢复时重新生成。
@@ -594,7 +576,7 @@ test "恢复地图产出对象只写回生命" {
     try std.testing.expectEqual(4, product.health);
 }
 
-test "恢复 gone 只清除产出对象自己的碰撞矩形" {
+test "恢复已移除的产出对象时只清除它自己的阻挡" {
     const gpa = std.testing.allocator;
     var world = ecs.World.init(gpa);
     defer world.deinit();
@@ -628,18 +610,18 @@ test "恢复 gone 只清除产出对象自己的碰撞矩形" {
     loaded.land.tiles[0].object = .{ .kind = .product, .entity = entity };
     world.add(entity, component.map.SolidRange{ .start = 0, .count = 1 });
 
-    const mover = world.createEntity();
-    world.add(mover, Position.zero);
-    world.add(mover, motion.Shape{ .rect = .init(.zero, .one) });
-    try std.testing.expect(slide(&world, mover, .xy(16, 0)).approxEqual(.xy(3, 0)));
+    const productArea: zhu.Shape = .{ .rect = .init(.xy(5, 1), .one) };
+    const neighborArea: zhu.Shape = .{ .rect = .init(.xy(9, 1), .one) };
+    try std.testing.expect(loaded.collision.overlaps(productArea));
+    try std.testing.expect(loaded.collision.overlaps(neighborArea));
 
     restoreObject(&world, 0, .gone);
 
     try std.testing.expectEqual(null, loaded.land.tiles[0].object);
     try std.testing.expectEqual(.product, loaded.land.tiles[0].gone);
     try std.testing.expect(!world.has(entity, item.Product));
-    try std.testing.expectEqual(zhu.Vector2.zero, loaded.areas.items[0].size);
-    try std.testing.expect(slide(&world, mover, .xy(16, 0)).approxEqual(.xy(7, 0)));
+    try std.testing.expect(!loaded.collision.overlaps(productArea));
+    try std.testing.expect(loaded.collision.overlaps(neighborArea));
 }
 
 test "对象层产出对象按碰撞范围占用格子" {

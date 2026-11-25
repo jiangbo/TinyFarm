@@ -5,6 +5,7 @@ const ecs = @import("ecs");
 const component = @import("../component.zig");
 const map = @import("../map.zig");
 
+const spatial = zhu.extend.spatial;
 const Position = component.Position;
 const Player = component.actor.Player;
 const Velocity = component.motion.Velocity;
@@ -14,6 +15,11 @@ const World = ecs.World;
 const Entity = ecs.Entity;
 
 pub fn update(world: *const World, delta: f32) void {
+    move(world, map.collision(), delta);
+    followPlayer(world, delta);
+}
+
+fn move(world: *const World, collision: *const spatial.Static, delta: f32) void {
     var query = world.query(.{ Position, Velocity });
     while (query.next()) |row| {
         const velocity = row.get(Velocity);
@@ -21,10 +27,34 @@ pub fn update(world: *const World, delta: f32) void {
 
         const pos = row.getPtr(Position);
         const offset = velocity.value.scale(delta);
-        pos.* = pos.add(map.slide(world, row.entity, offset));
+        pos.* = pos.add(slide(world, collision, row.entity, offset));
     }
+}
 
-    followPlayer(world, delta);
+// 合并静态碰撞与动态实体的碰撞，计算滑墙后的实际位移。
+fn slide(
+    world: *const World,
+    collision: *const spatial.Static,
+    entity: Entity,
+    delta: zhu.Vector2,
+) zhu.Vector2 {
+    const position = world.get(entity, Position).?;
+    const body = world.get(entity, Shape).?.move(position);
+    var s = spatial.Slide.init(body, delta);
+    while (s.next()) |step| {
+        var best = collision.sweep(step.body, step.move);
+
+        var query = world.query(.{ Position, Shape, Blocking });
+        while (query.next()) |row| {
+            if (row.entity == entity) continue;
+            const other = row.get(Shape).move(row.get(Position));
+            if (step.body.sweep(other, step.move)) |hit| {
+                spatial.Contact.record(&best, hit);
+            }
+        }
+        s.advance(best);
+    }
+    return s.moved;
 }
 
 fn followPlayer(world: *const World, delta: f32) void {
@@ -35,71 +65,26 @@ fn followPlayer(world: *const World, delta: f32) void {
     zhu.camera.smoothFollow(position, speed, delta);
 }
 
-test "移动系统会按速度更新位置" {
+test "有碰撞形状的实体只有带 Blocking 才阻挡移动" {
     var world = World.init(std.testing.allocator);
     defer world.deinit();
-    map.load(std.testing.allocator, &world, testMap);
-    defer map.unload(std.testing.allocator);
 
-    const entity = world.createEntity();
-    world.add(entity, Position.xy(10, 20));
-    world.add(entity, Velocity{ .value = .xy(3, -4) });
-    world.add(entity, Shape{ .rect = .init(.zero, .xy(1, 1)) });
+    const shape: Shape = .{ .rect = .init(.zero, .xy(10, 10)) };
+    const mover = world.createEntity();
+    world.add(mover, Position.zero);
+    world.add(mover, Velocity{ .value = .xy(20, 10) });
+    world.add(mover, shape);
+    world.add(mover, Blocking{});
 
-    update(&world, 0.5);
+    const obstacle = world.createEntity();
+    world.add(obstacle, Position.xy(10, 0));
+    world.add(obstacle, shape);
 
-    const position = world.get(entity, Position).?;
-    try std.testing.expect(position.approxEqual(.xy(11.5, 18)));
-}
+    move(&world, &.{}, 0.5);
+    try std.testing.expectEqual(Position.xy(10, 5), world.get(mover, Position).?);
 
-const testMap = zhu.extend.tiled.Map{
-    .grid = .{ .width = 30, .height = 17, .cellSide = 16 },
-    .layers = &.{},
-};
-
-fn addMover(world: *World, position: zhu.Vector2, velocity: zhu.Vector2) Entity {
-    const entity = world.createEntity();
-    world.add(entity, position);
-    world.add(entity, Velocity{ .value = velocity });
-    world.add(entity, Shape{ .rect = .init(.zero, .xy(10, 10)) });
-    world.add(entity, Blocking{});
-    return entity;
-}
-
-fn addBlocker(world: *World, position: zhu.Vector2, blocking: bool) Entity {
-    const entity = world.createEntity();
-    world.add(entity, position);
-    world.add(entity, Shape{ .rect = .init(.zero, .xy(10, 10)) });
-    if (blocking) world.add(entity, Blocking{});
-    return entity;
-}
-
-test "带 Blocking 的 Shape 会挡住移动" {
-    var world = World.init(std.testing.allocator);
-    defer world.deinit();
-    map.load(std.testing.allocator, &world, testMap);
-    defer map.unload(std.testing.allocator);
-
-    const mover = addMover(&world, .xy(0, 0), .xy(10, 5));
-    _ = addBlocker(&world, .xy(10, 0), true);
-
-    update(&world, 1);
-
-    const position = world.get(mover, Position).?;
-    try std.testing.expectEqual(0, position.x);
-    try std.testing.expectEqual(5, position.y);
-}
-
-test "没有 Blocking 的 Shape 不会挡住移动" {
-    var world = World.init(std.testing.allocator);
-    defer world.deinit();
-    map.load(std.testing.allocator, &world, testMap);
-    defer map.unload(std.testing.allocator);
-
-    const mover = addMover(&world, .xy(0, 0), .xy(10, 0));
-    _ = addBlocker(&world, .xy(10, 0), false);
-
-    update(&world, 1);
-
-    try std.testing.expectEqual(10, world.get(mover, Position).?.x);
+    world.getPtr(mover, Position).?.* = .zero;
+    world.add(obstacle, Blocking{});
+    move(&world, &.{}, 0.5);
+    try std.testing.expectEqual(Position.xy(0, 5), world.get(mover, Position).?);
 }
