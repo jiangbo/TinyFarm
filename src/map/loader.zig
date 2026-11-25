@@ -4,7 +4,6 @@ const ecs = @import("ecs");
 
 const component = @import("../component.zig");
 const factory = @import("../factory.zig");
-const Land = @import("Land.zig");
 const Map = @import("../resource/Map.zig");
 
 const tiled = zhu.extend.tiled;
@@ -19,14 +18,12 @@ const SolidRange = component.map.SolidRange;
 const mock: []const tiled.Map = @import("../zon/maps/mock.zon");
 
 pub const Loaded = struct {
-    land: Land = .{},
     collision: spatial.Static = .{},
     areas: std.ArrayList(zhu.Rect) = .empty,
     loaded: bool = false,
 
     pub fn deinit(self: *Loaded, gpa: std.mem.Allocator) void {
         if (!self.loaded) return;
-        self.land.deinit(gpa);
         self.collision.deinit(gpa);
         self.areas.clearAndFree(gpa);
         self.loaded = false;
@@ -48,12 +45,12 @@ const Context = struct {
     map: tiled.Map,
     world: *World,
     loaded: *Loaded,
-    visual: *Map,
+    current: *Map,
 };
 
 pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map, out: *Map) Loaded {
     const grid = map.grid;
-    var result: Loaded = .{ .land = Land.init(gpa, grid) };
+    var result: Loaded = .{};
     result.collision.mask = spatial.SolidMask.init(gpa, .{
         .width = grid.width * 2,
         .height = grid.height * 2,
@@ -65,7 +62,7 @@ pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map, out: *Map) Lo
         .map = map,
         .world = world,
         .loaded = &result,
-        .visual = out,
+        .current = out,
     };
     parseLayers(&ctx);
     // 建表后不再追加矩形，销毁物件只需将对应矩形置空。
@@ -85,8 +82,8 @@ fn parseLayers(ctx: *Context) void {
         .image => parseImageLayer(ctx, layer),
         .object => {
             if (!foundFrontLayer and layer.isNamed("main")) {
-                const start = ctx.visual.vertexes.items.len;
-                ctx.visual.frontStart = start;
+                const start = ctx.current.vertexes.items.len;
+                ctx.current.frontStart = start;
                 foundFrontLayer = true;
             }
             parseObjectLayer(ctx, layer);
@@ -94,13 +91,13 @@ fn parseLayers(ctx: *Context) void {
     };
 
     if (!foundFrontLayer) {
-        ctx.visual.frontStart = ctx.visual.vertexes.items.len;
+        ctx.current.frontStart = ctx.current.vertexes.items.len;
     }
 
     std.log.info("map loaded: {}x{}, tiles: {}", .{
         ctx.map.grid.width,
         ctx.map.grid.height,
-        ctx.visual.vertexes.items.len,
+        ctx.current.vertexes.items.len,
     });
 }
 
@@ -123,8 +120,8 @@ fn parseTileLayer(ctx: *Context, layer: *const tiled.Layer) void {
         if (ctx.map.getImage(globalId)) |image| {
             const position = ctx.map.grid.indexToWorld(index);
             if (ctx.map.getAnimation(globalId)) |animation| {
-                ctx.visual.addAnimatedTile(ctx.gpa, position, animation);
-            } else ctx.visual.addImage(ctx.gpa, position, image);
+                ctx.current.addAnimatedTile(ctx.gpa, position, animation);
+            } else ctx.current.addImage(ctx.gpa, position, image);
         }
 
         const tile = ctx.map.getTile(globalId) orelse continue;
@@ -142,7 +139,7 @@ fn loadRockTile(ctx: *Context, globalId: u32, index: usize) void {
     const start = ctx.loaded.areas.items.len;
     ctx.loaded.addSolidRect(ctx.gpa, ctx.map.grid.indexToRect(index));
     ctx.world.add(entity, SolidRange{ .start = start, .count = 1 });
-    ctx.loaded.land.tiles[index].set(.product, entity);
+    ctx.current.tiles[index].set(.product, entity);
 }
 
 const TileFlag = enum {
@@ -173,7 +170,7 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
             .BLOCK_W => .init(tile.min, .xy(half, tile.size.y)),
             .BLOCK_E => .init(tile.min.addX(half), .xy(half, tile.size.y)),
             else => {
-                ctx.loaded.land.tiles[index].marks.insert(switch (flag) {
+                ctx.current.tiles[index].marks.insert(switch (flag) {
                     .HAZARD => .hazard,
                     .WATER => .water,
                     .INTERACT => .interact,
@@ -191,7 +188,7 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
 fn parseImageLayer(ctx: *Context, layer: *const tiled.Layer) void {
     const image = zhu.assets.getImage(layer.image).?
         .sub(.init(.zero, .xy(layer.width, layer.height)));
-    ctx.visual.addImage(ctx.gpa, layer.offset, image);
+    ctx.current.addImage(ctx.gpa, layer.offset, image);
 }
 
 fn parseObjectLayer(ctx: *Context, layer: *const tiled.Layer) void {
@@ -283,7 +280,7 @@ fn loadProp(ctx: *Context, object: tiled.Object) void {
             .rect = rect.move(position.neg()),
         });
 
-        const tile = ctx.loaded.land.getTile(rect.center()).?;
+        const tile = ctx.current.getTile(rect.center()).?;
         tile.object = .{ .kind = .chest, .entity = entity };
     }
     if (ctx.world.has(entity, item.Product)) {
@@ -342,7 +339,7 @@ fn loadLight(ctx: *Context, object: tiled.Object) void {
 fn setProductTiles(ctx: *Context, entity: ecs.Entity, rect: zhu.Rect) void {
     var iter = ctx.map.grid.indicesInRect(rect);
     while (iter.next()) |index| {
-        ctx.loaded.land.tiles[index].set(.product, entity);
+        ctx.current.tiles[index].set(.product, entity);
     }
 }
 
@@ -350,9 +347,9 @@ test "actor 点对象会生成 NPC，player 点对象只保留标记" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var visual = Map{ .grid = mock[0].grid };
-    defer visual.deinit(std.testing.allocator);
-    var loaded = load(std.testing.allocator, &world, mock[0], &visual);
+    var current = Map.init(std.testing.allocator, mock[0].grid);
+    defer current.deinit(std.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, mock[0], &current);
     defer loaded.deinit(std.testing.allocator);
 
     var query = world.query(.{
@@ -379,9 +376,9 @@ test "trigger 对象会创建 ECS 触发器实体" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var visual = Map{ .grid = mock[1].grid };
-    defer visual.deinit(std.testing.allocator);
-    var loaded = load(std.testing.allocator, &world, mock[1], &visual);
+    var current = Map.init(std.testing.allocator, mock[1].grid);
+    defer current.deinit(std.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, mock[1], &current);
     defer loaded.deinit(std.testing.allocator);
 
     var query = world.query(.{component.map.Trigger});
@@ -401,9 +398,9 @@ test "rest 对象会创建可交互实体" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var visual = Map{ .grid = mock[2].grid };
-    defer visual.deinit(std.testing.allocator);
-    var loaded = load(std.testing.allocator, &world, mock[2], &visual);
+    var current = Map.init(std.testing.allocator, mock[2].grid);
+    defer current.deinit(std.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, mock[2], &current);
     defer loaded.deinit(std.testing.allocator);
 
     var query = world.query(.{
@@ -461,27 +458,27 @@ test "加载地图产出对象会按对象和 rock 图层写入目标格" {
 
     var testMap = mock[3];
     testMap.tileSets = &testTileSets;
-    var visual = Map{ .grid = testMap.grid };
-    defer visual.deinit(std.testing.allocator);
-    var loaded = load(std.testing.allocator, &world, testMap, &visual);
+    var current = Map.init(std.testing.allocator, testMap.grid);
+    defer current.deinit(std.testing.allocator);
+    var loaded = load(std.testing.allocator, &world, testMap, &current);
     defer loaded.deinit(std.testing.allocator);
 
-    const tree = loaded.land.tiles[0].object.?;
-    const rock = loaded.land.tiles[1].object.?;
+    const tree = current.tiles[0].object.?;
+    const rock = current.tiles[1].object.?;
     const treeProd = world.get(tree.entity, item.Product).?;
     const rockProd = world.get(rock.entity, item.Product).?;
     const treeCfg = factory.itemConfig(.timber);
     const rockCfg = factory.itemConfig(.stone);
 
     try std.testing.expectEqual(.product, tree.kind);
-    try std.testing.expectEqual(.none, loaded.land.tiles[0].gone);
+    try std.testing.expectEqual(.none, current.tiles[0].gone);
     try std.testing.expectEqual(.timber, treeProd.drop.item);
     try std.testing.expectEqual(treeCfg.health.?, treeProd.health);
     try std.testing.expectEqual(.product, rock.kind);
-    try std.testing.expectEqual(.none, loaded.land.tiles[1].gone);
+    try std.testing.expectEqual(.none, current.tiles[1].gone);
     try std.testing.expectEqual(.stone, rockProd.drop.item);
     try std.testing.expectEqual(rockCfg.health.?, rockProd.health);
-    try std.testing.expectEqual(null, loaded.land.tiles[2].object);
+    try std.testing.expectEqual(null, current.tiles[2].object);
     const range = world.get(rock.entity, SolidRange).?;
     const rect = testMap.grid.indexToRect(1);
     try std.testing.expectEqualSlices(zhu.Rect, &.{rect}, loaded.solidAreas(range));

@@ -6,7 +6,6 @@ const component = @import("component.zig");
 const factory = @import("factory.zig");
 const loader = @import("map/loader.zig");
 const storage = @import("storage.zig");
-const Land = @import("map/Land.zig");
 const Clock = @import("resource/Clock.zig");
 const Map = @import("resource/Map.zig");
 
@@ -74,17 +73,13 @@ pub fn enter(gpa: std.mem.Allocator, world: *World, id: Id) void {
     _ = factory.spawnMapTrigger(world, trigger);
 }
 
-pub fn getLoaded() *loader.Loaded {
-    return &loaded;
-}
-
 pub fn exit(gpa: std.mem.Allocator, world: *const World) void {
     saveCurrent(gpa, world);
     unload(gpa, world);
 }
 
 pub fn load(gpa: std.mem.Allocator, world: *World, mapData: tiled.Map) void {
-    world.addResource(Map{ .grid = mapData.grid });
+    world.addResource(Map.init(gpa, mapData.grid));
     zhu.camera.bound = mapData.grid.size();
     loaded = loader.load(gpa, world, mapData, world.getResourcePtr(Map).?);
 }
@@ -126,32 +121,18 @@ pub fn restore(gpa: std.mem.Allocator, saved: storage.MapRecord, day: u32) void 
     }
 }
 
-pub fn hoe(position: zhu.Vector2) bool {
-    if (!canHoeTile(position)) return false;
-    return loaded.land.hoe(position);
-}
-
-fn canHoeTile(position: zhu.Vector2) bool {
-    const grid = loaded.land.grid;
-    const index = grid.worldToIndex(position) orelse return false;
-    const marks = loaded.land.tiles[index].marks;
+pub fn hoe(current: *Map, position: zhu.Vector2) bool {
+    const index = current.grid.worldToIndex(position) orelse return false;
+    const tile = &current.tiles[index];
+    if (tile.ground != null or tile.object != null) return false;
+    const marks = tile.marks;
     if (!marks.contains(.arable)) return false;
     if (marks.contains(.water)) return false;
     if (marks.contains(.occupied)) return false;
-    const body: zhu.Shape = .{ .rect = grid.indexToRect(index) };
-    return !loaded.collision.overlaps(body);
-}
-
-pub fn canPlant(position: zhu.Vector2) bool {
-    return loaded.land.canPlant(position);
-}
-
-pub fn water(position: zhu.Vector2) bool {
-    return loaded.land.water(position);
-}
-
-pub fn getTile(position: zhu.Vector2) ?*Land.Tile {
-    return loaded.land.getTile(position);
+    const body: zhu.Shape = .{ .rect = current.grid.indexToRect(index) };
+    if (loaded.collision.overlaps(body)) return false;
+    tile.ground = .dry;
+    return true;
 }
 
 pub fn collision() *const spatial.Static {
@@ -160,14 +141,15 @@ pub fn collision() *const spatial.Static {
 
 // 清除地图上的默认产出对象，并记录为 gone，避免后续恢复时重新生成。
 pub fn clearProduct(world: *World, position: zhu.Vector2) void {
-    clearProductIndex(world, loaded.land.grid.worldToIndex(position).?);
+    const current = world.getResourcePtr(Map).?;
+    clearProductIndex(world, current, current.grid.worldToIndex(position).?);
 }
 
 fn saveCurrent(gpa: std.mem.Allocator, world: *const World) void {
     const day = world.getResourcePtr(Clock).?.*.day;
-    const id = world.getResourcePtr(Map).?.id;
-    const state = ensure(gpa, id, loaded.land.tiles.len, day);
-    for (loaded.land.tiles, 0..) |tile, index| {
+    const current = world.getResourcePtr(Map).?;
+    const state = ensure(gpa, current.id, current.tiles.len, day);
+    for (current.tiles, 0..) |tile, index| {
         var saved = &state.tiles[index];
         saved.ground = tile.ground;
         if (objectAt(world, tile)) |object| {
@@ -183,12 +165,12 @@ fn saveCurrent(gpa: std.mem.Allocator, world: *const World) void {
 
 fn restoreCurrent(gpa: std.mem.Allocator, world: *World) void {
     const day = world.getResourcePtr(Clock).?.*.day;
-    const id = world.getResourcePtr(Map).?.id;
-    const state = ensure(gpa, id, loaded.land.tiles.len, day);
+    const current = world.getResourcePtr(Map).?;
+    const state = ensure(gpa, current.id, current.tiles.len, day);
     advanceState(state, day);
 
     for (state.tiles, 0..) |saved, index| {
-        const tile = &loaded.land.tiles[index];
+        const tile = &current.tiles[index];
         tile.ground = saved.ground;
 
         const object = saved.object orelse continue;
@@ -240,7 +222,7 @@ fn restoreMap(gpa: std.mem.Allocator, id: Id, saved: SaveMap, day: u32) void {
     state.day = saved.day;
 }
 
-fn objectAt(world: *const World, tile: Land.Tile) ?Object {
+fn objectAt(world: *const World, tile: Map.Tile) ?Object {
     const object = tile.object orelse return null;
     return switch (object.kind) {
         .crop => .{ .crop = world.get(object.entity, farm.Crop).? },
@@ -250,17 +232,18 @@ fn objectAt(world: *const World, tile: Land.Tile) ?Object {
 }
 
 fn restoreObject(world: *World, index: usize, data: Object) void {
+    const current = world.getResourcePtr(Map).?;
     switch (data) {
-        .gone => clearProductIndex(world, index),
+        .gone => clearProductIndex(world, current, index),
         .crop => |crop| {
-            const position = loaded.land.grid.indexToWorld(index);
+            const position = current.grid.indexToWorld(index);
             const entity = factory.spawnCrop(world, position, crop.kind);
             world.getPtr(entity, farm.Crop).?.* = crop;
             refreshCropSprite(world, entity, crop);
-            loaded.land.tiles[index].set(.crop, entity);
+            current.tiles[index].set(.crop, entity);
         },
         .chest => |saved| {
-            const object = loaded.land.tiles[index].object.?;
+            const object = current.tiles[index].object.?;
             std.debug.assert(object.kind == .chest);
             const chest = world.getPtr(object.entity, item.Chest).?;
             chest.* = saved;
@@ -277,27 +260,27 @@ fn restoreObject(world: *World, index: usize, data: Object) void {
             world.remove(object.entity, motion.Shape);
         },
         .product => |saved| {
-            const object = loaded.land.tiles[index].object.?;
+            const object = current.tiles[index].object.?;
             std.debug.assert(object.kind == .product);
             world.getPtr(object.entity, item.Product).?.health = saved;
         },
     }
 }
 
-fn clearProductIndex(world: *World, index: usize) void {
-    const object = loaded.land.tiles[index].object.?;
+fn clearProductIndex(world: *World, current: *Map, index: usize) void {
+    const object = current.tiles[index].object.?;
     std.debug.assert(object.kind == .product);
     if (world.get(object.entity, component.map.SolidRange)) |range| {
         for (loaded.solidAreas(range)) |*area| area.* = .init(.zero, .zero);
     }
     world.destroyEntity(object.entity);
-    clearProductTiles(object.entity);
-    loaded.land.tiles[index].gone = .product;
+    clearProductTiles(current.tiles, object.entity);
+    current.tiles[index].gone = .product;
 }
 
 // 只清引用，不写 gone；gone 只记录在触发销毁的那一个格子上。
-fn clearProductTiles(entity: ecs.Entity) void {
-    for (loaded.land.tiles) |*tile| {
+fn clearProductTiles(tiles: []Map.Tile, entity: ecs.Entity) void {
+    for (tiles) |*tile| {
         if (tile.get(.product) == entity) tile.object = null;
     }
 }
@@ -408,11 +391,12 @@ test "湿地离线跨天只加速一天" {
 }
 
 test "当前地图和离线地图跨天推进规则一致" {
-    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(std.testing.allocator);
-
-    var world = ecs.World.init(std.testing.allocator);
+    const gpa = std.testing.allocator;
+    var world = ecs.World.init(gpa);
     defer world.deinit();
+    world.addResource(Map.init(gpa, maps[0].grid));
+    const current = world.getResourcePtr(Map).?;
+    defer current.deinit(gpa);
 
     const target = zhu.Vector2.xy(32, 48);
     const cropEntity = world.createEntity();
@@ -423,7 +407,7 @@ test "当前地图和离线地图跨天推进规则一致" {
     });
     world.add(cropEntity, render.Sprite{ .image = .{} });
     world.add(cropEntity, render.Render{ .layer = .crop });
-    const tile = loaded.land.getTile(target).?;
+    const tile = current.getTile(target).?;
     tile.ground = .wet;
     tile.set(.crop, cropEntity);
     world.addEvent(component.event.DayChanged{ .day = 2 });
@@ -454,11 +438,12 @@ test "当前地图和离线地图跨天推进规则一致" {
 }
 
 test "恢复已打开宝箱会移除动画组件" {
-    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(std.testing.allocator);
-
-    var world = ecs.World.init(std.testing.allocator);
+    const gpa = std.testing.allocator;
+    var world = ecs.World.init(gpa);
     defer world.deinit();
+    world.addResource(Map.init(gpa, maps[0].grid));
+    const current = world.getResourcePtr(Map).?;
+    defer current.deinit(gpa);
 
     const frames = [_]zhu.graphics.Frame{
         .{ .offset = .xy(0, 0), .duration = 0.1 },
@@ -470,7 +455,7 @@ test "恢复已打开宝箱会移除动画组件" {
     world.add(chest, item.Chest{});
     world.add(chest, actor.Animation.init(image, .xy(16, 16), &frames));
     world.add(chest, render.Sprite{ .image = image });
-    loaded.land.tiles[0].object = .{ .kind = .chest, .entity = chest };
+    current.tiles[0].object = .{ .kind = .chest, .entity = chest };
 
     restoreObject(&world, 0, .{ .chest = .{ .opened = true } });
 
@@ -483,15 +468,16 @@ test "恢复已打开宝箱会移除动画组件" {
 }
 
 test "恢复地图产出对象只写回生命" {
-    loaded.land = Land.init(std.testing.allocator, maps[0].grid);
-    defer loaded.land.deinit(std.testing.allocator);
-
-    var world = ecs.World.init(std.testing.allocator);
+    const gpa = std.testing.allocator;
+    var world = ecs.World.init(gpa);
     defer world.deinit();
+    world.addResource(Map.init(gpa, maps[0].grid));
+    const current = world.getResourcePtr(Map).?;
+    defer current.deinit(gpa);
 
     const entity = world.createEntity();
     world.add(entity, item.Product{ .drop = .one(.stone), .health = 1 });
-    loaded.land.tiles[0].object = .{ .kind = .product, .entity = entity };
+    current.tiles[0].object = .{ .kind = .product, .entity = entity };
 
     restoreObject(&world, 0, .{ .product = 4 });
 
@@ -529,10 +515,11 @@ test "恢复已移除的产出对象时只清除它自己的阻挡" {
         .objects = &objects,
     }} });
     defer unload(gpa, &world);
+    const current = world.getResourcePtr(Map).?;
 
     const entity = world.createEntity();
     world.add(entity, item.Product{ .drop = .one(.stone), .health = 1 });
-    loaded.land.tiles[0].object = .{ .kind = .product, .entity = entity };
+    current.tiles[0].object = .{ .kind = .product, .entity = entity };
     world.add(entity, component.map.SolidRange{ .start = 0, .count = 1 });
 
     const productArea: zhu.Shape = .{ .rect = .init(.xy(5, 1), .one) };
@@ -542,8 +529,8 @@ test "恢复已移除的产出对象时只清除它自己的阻挡" {
 
     restoreObject(&world, 0, .gone);
 
-    try std.testing.expectEqual(null, loaded.land.tiles[0].object);
-    try std.testing.expectEqual(.product, loaded.land.tiles[0].gone);
+    try std.testing.expectEqual(null, current.tiles[0].object);
+    try std.testing.expectEqual(.product, current.tiles[0].gone);
     try std.testing.expect(!world.has(entity, item.Product));
     try std.testing.expect(!loaded.collision.overlaps(productArea));
     try std.testing.expect(loaded.collision.overlaps(neighborArea));
@@ -617,52 +604,63 @@ test "对象层产出对象按碰撞范围占用格子" {
     var world = ecs.World.init(std.testing.allocator);
     defer world.deinit();
 
-    var visual = Map{ .grid = testMap.grid };
-    defer visual.deinit(std.testing.allocator);
-    loaded = loader.load(std.testing.allocator, &world, testMap, &visual);
+    world.addResource(Map.init(std.testing.allocator, testMap.grid));
+    const current = world.getResourcePtr(Map).?;
+    defer current.deinit(std.testing.allocator);
+    loaded = loader.load(std.testing.allocator, &world, testMap, current);
     defer loaded.deinit(std.testing.allocator);
 
-    loaded.land.tiles[0].marks.insert(.arable);
-    loaded.land.tiles[1].marks.insert(.arable);
+    current.tiles[0].marks.insert(.arable);
+    current.tiles[1].marks.insert(.arable);
 
-    const product = loaded.land.tiles[1].get(.product).?;
-    try std.testing.expectEqual(null, loaded.land.tiles[0].object);
-    try std.testing.expect(loaded.land.hoe(.xy(8, 8)));
-    try std.testing.expect(!loaded.land.hoe(.xy(24, 8)));
+    const product = current.tiles[1].get(.product).?;
+    try std.testing.expectEqual(null, current.tiles[0].object);
+    try std.testing.expect(hoe(current, .xy(8, 8)));
+    try std.testing.expect(!hoe(current, .xy(24, 8)));
 
     clearProduct(&world, testMap.grid.indexToWorld(1));
 
-    try std.testing.expectEqual(null, loaded.land.tiles[0].object);
-    try std.testing.expectEqual(null, loaded.land.tiles[1].object);
-    try std.testing.expectEqual(.none, loaded.land.tiles[0].gone);
-    try std.testing.expectEqual(.product, loaded.land.tiles[1].gone);
+    try std.testing.expectEqual(null, current.tiles[0].object);
+    try std.testing.expectEqual(null, current.tiles[1].object);
+    try std.testing.expectEqual(.none, current.tiles[0].gone);
+    try std.testing.expectEqual(.product, current.tiles[1].gone);
     try std.testing.expect(!world.has(product, item.Product));
 }
 
-test "canHoeTile 要求可耕作且没有地图阻挡语义" {
+test "锄地要求可耕作且没有地图阻挡语义" {
     const gpa = std.testing.allocator;
     var world = ecs.World.init(gpa);
     defer world.deinit();
-    load(gpa, &world, .{ .grid = .{ .width = 10, .height = 12, .cellSide = 16 } });
+    const grid: spatial.Grid = .{ .width = 10, .height = 12, .cellSide = 16 };
+    load(gpa, &world, .{ .grid = grid });
     defer unload(gpa, &world);
+    const current = world.getResourcePtr(Map).?;
 
     const position = zhu.Vector2.xy(24, 40);
-    const grid = loaded.land.grid;
     const index = grid.worldToIndex(position).?;
 
-    try std.testing.expect(!canHoeTile(position));
+    try std.testing.expect(!hoe(current, position));
 
-    loaded.land.tiles[index].marks.insert(.arable);
-    try std.testing.expect(canHoeTile(position));
+    const tile = &current.tiles[index];
+    tile.marks.insert(.arable);
+    try std.testing.expect(hoe(current, position));
+    try std.testing.expectEqual(.dry, tile.ground);
+    try std.testing.expect(!hoe(current, position));
+    tile.ground = null;
 
-    loaded.land.tiles[index].marks.insert(.water);
-    try std.testing.expect(!canHoeTile(position));
-    loaded.land.tiles[index].marks.remove(.water);
+    tile.set(.crop, world.createEntity());
+    try std.testing.expect(!hoe(current, position));
+    try std.testing.expectEqual(null, tile.ground);
+    tile.object = null;
 
-    loaded.land.tiles[index].marks.insert(.occupied);
-    try std.testing.expect(!canHoeTile(position));
-    loaded.land.tiles[index].marks.remove(.occupied);
+    tile.marks.insert(.water);
+    try std.testing.expect(!hoe(current, position));
+    tile.marks.remove(.water);
+
+    tile.marks.insert(.occupied);
+    try std.testing.expect(!hoe(current, position));
+    tile.marks.remove(.occupied);
 
     loaded.collision.setCellsInRect(grid.indexToRect(index));
-    try std.testing.expect(!canHoeTile(position));
+    try std.testing.expect(!hoe(current, position));
 }

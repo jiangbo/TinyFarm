@@ -4,7 +4,6 @@ const ecs = @import("ecs");
 
 const component = @import("component.zig");
 const map = @import("map.zig");
-const Land = @import("map/Land.zig");
 const Clock = @import("resource/Clock.zig");
 const Map = @import("resource/Map.zig");
 
@@ -80,9 +79,8 @@ pub fn draw(world: *const World) void {
     drawLights(world);
 
     zhu.batch.useTarget(clearColor, .{ .target = &canvas });
-    const loaded = map.getLoaded();
     current.drawBack(mapImage);
-    drawGround(&loaded.land);
+    current.drawGround(dryLandImage, wetLandImage);
     drawSprites(world);
     current.drawFront(mapImage);
     drawTarget(world, current.grid.cellSize());
@@ -95,24 +93,6 @@ pub fn draw(world: *const World) void {
     zhu.camera.push(.window);
     defer zhu.camera.pop();
     zhu.batch.drawImage(canvas.image, .zero, .{});
-}
-
-fn drawGround(land: *const Land) void {
-    for (land.tiles, 0..) |tile, index| {
-        const ground = tile.ground orelse continue;
-        const position = land.grid.indexToWorld(index);
-        appendGroundVertex(position, dryLandImage);
-        if (ground == .wet) appendGroundVertex(position, wetLandImage);
-    }
-}
-
-fn appendGroundVertex(position: zhu.Vector2, image: zhu.Image) void {
-    zhu.assets.gpu.addVertex(.{
-        .position = position,
-        .layer = image.layer,
-        .size = image.size,
-        .uvRect = image.uvRect(),
-    });
 }
 
 fn drawSprites(world: *const World) void {
