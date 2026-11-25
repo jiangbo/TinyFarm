@@ -48,7 +48,6 @@ pub fn init(allocator_: std.mem.Allocator) void {
     storage.init();
     ui.init(&storage.slots);
     title.init();
-    map.init();
     render.init();
     enterScene(current);
 }

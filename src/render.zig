@@ -4,6 +4,7 @@ const ecs = @import("ecs");
 
 const component = @import("component.zig");
 const map = @import("map.zig");
+const Land = @import("map/Land.zig");
 const Clock = @import("resource/Clock.zig");
 const Map = @import("resource/Map.zig");
 
@@ -41,6 +42,9 @@ var lightCanvas: zhu.graphics.RenderTarget = .{};
 var bubbleImage: zhu.NineImage = undefined;
 var glowImage: zhu.Image = undefined;
 var spotImage: zhu.Image = undefined;
+var mapImage: zhu.Image = undefined;
+var dryLandImage: zhu.Image = undefined;
+var wetLandImage: zhu.Image = undefined;
 
 pub fn init() void {
     canvas = zhu.graphics.createRenderTarget(zhu.camera.size, .nearest);
@@ -55,6 +59,12 @@ pub fn init() void {
     });
     glowImage = zhu.getImage("light.png").?;
     spotImage = zhu.getImage("spot.png").?;
+    mapImage = zhu.getImage("circle.png").?;
+    const land = zhu.getImage(
+        "farm-rpg/Farm/Tileset/Modular/Tilled Soil and wet soil.png",
+    ).?;
+    dryLandImage = land.sub(.init(.xy(0, 48), .xy(16, 16)));
+    wetLandImage = land.sub(.init(.xy(192, 48), .xy(16, 16)));
 }
 
 pub fn deinit() void {
@@ -70,9 +80,14 @@ pub fn draw(world: *const World) void {
     drawLights(world);
 
     zhu.batch.useTarget(clearColor, .{ .target = &canvas });
-    map.drawBack();
+    const loaded = map.getLoaded();
+    const vertexes = loaded.vertexes.items;
+    const back = vertexes[0..loaded.frontStart];
+    const front = vertexes[loaded.frontStart..];
+    if (vertexes.len != 0) zhu.batch.drawVertices(mapImage, back);
+    drawGround(&loaded.land);
     drawSprites(world);
-    map.drawFront();
+    if (front.len != 0) zhu.batch.drawVertices(mapImage, front);
     drawTarget(world);
     // 对比过不参与光照的效果，确认保留对话气泡参与光照合成。
     drawDialog(world);
@@ -83,6 +98,24 @@ pub fn draw(world: *const World) void {
     zhu.camera.push(.window);
     defer zhu.camera.pop();
     zhu.batch.drawImage(canvas.image, .zero, .{});
+}
+
+fn drawGround(land: *const Land) void {
+    for (land.tiles, 0..) |tile, index| {
+        const ground = tile.ground orelse continue;
+        const position = land.grid.indexToWorld(index);
+        appendGroundVertex(position, dryLandImage);
+        if (ground == .wet) appendGroundVertex(position, wetLandImage);
+    }
+}
+
+fn appendGroundVertex(position: zhu.Vector2, image: zhu.Image) void {
+    zhu.assets.gpu.addVertex(.{
+        .position = position,
+        .layer = image.layer,
+        .size = image.size,
+        .uvRect = image.uvRect(),
+    });
 }
 
 fn drawSprites(world: *const World) void {

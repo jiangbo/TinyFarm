@@ -35,20 +35,8 @@ pub const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
 
 pub var current: Id = .school;
 pub var grid: spatial.Grid = maps[0].grid;
-var mapImage: zhu.Image = undefined;
-var dryLandImage: zhu.Image = undefined;
-var wetLandImage: zhu.Image = undefined;
 var loaded: loader.Loaded = .{};
 var states: std.EnumArray(Id, SaveMap) = .initFill(.{});
-
-pub fn init() void {
-    mapImage = zhu.getImage("circle.png").?;
-    const landImage = zhu.getImage(
-        "farm-rpg/Farm/Tileset/Modular/Tilled Soil and wet soil.png",
-    ).?;
-    dryLandImage = landImage.sub(.init(.xy(0, 48), .xy(16, 16)));
-    wetLandImage = landImage.sub(.init(.xy(192, 48), .xy(16, 16)));
-}
 
 pub fn deinit(gpa: std.mem.Allocator, world: *const World) void {
     if (loaded.loaded) exit(gpa, world);
@@ -356,21 +344,6 @@ pub fn refreshCropSprite(world: *const World, entity: Entity, crop: farm.Crop) v
     };
     if (crop.stage == .seed) return;
     world.getPtr(entity, render.Render).?.layer = .actor;
-}
-
-pub fn drawBack() void {
-    if (loaded.vertexes.items.len != 0) {
-        const back = loaded.vertexes.items[0..loaded.frontStart];
-        zhu.batch.drawVertices(mapImage, back);
-    }
-
-    loaded.land.draw(dryLandImage, wetLandImage);
-}
-
-pub fn drawFront() void {
-    if (loaded.frontStart == loaded.vertexes.items.len) return;
-    const front = loaded.vertexes.items[loaded.frontStart..];
-    zhu.batch.drawVertices(mapImage, front);
 }
 
 test "地图状态作物会按离线天数推进" {

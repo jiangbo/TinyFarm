@@ -87,24 +87,6 @@ pub fn water(self: *Land, position: zhu.Vector2) bool {
     return true;
 }
 
-pub fn draw(self: Land, dry: zhu.Image, wet: zhu.Image) void {
-    for (self.tiles, 0..) |tile, index| {
-        const ground = tile.ground orelse continue;
-        const position = self.grid.indexToWorld(index);
-        appendVertex(position, dry);
-        if (ground == .wet) appendVertex(position, wet);
-    }
-}
-
-fn appendVertex(position: zhu.Vector2, image: zhu.Image) void {
-    zhu.assets.gpu.addVertex(.{
-        .position = position,
-        .layer = image.layer,
-        .size = image.size,
-        .uvRect = image.uvRect(),
-    });
-}
-
 test "锄地会记录目标格" {
     const grid = Grid{ .width = 3, .height = 4, .cellSide = 16 };
     var land = Land.init(std.testing.allocator, grid);
