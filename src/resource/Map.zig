@@ -120,15 +120,3 @@ pub fn getTile(self: *const Map, position: zhu.Vector2) ?*Tile {
     const index = self.grid.worldToIndex(position) orelse return null;
     return &self.tiles[index];
 }
-
-pub fn canPlant(self: *const Map, position: zhu.Vector2) bool {
-    const tile = self.getTile(position) orelse return false;
-    return tile.ground != null and tile.object == null;
-}
-
-pub fn water(self: *Map, position: zhu.Vector2) bool {
-    const tile = self.getTile(position) orelse return false;
-    if (tile.ground == null) return false;
-    tile.ground = .wet;
-    return true;
-}

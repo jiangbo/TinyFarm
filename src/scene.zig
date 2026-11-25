@@ -40,7 +40,6 @@ pub fn init(allocator_: std.mem.Allocator) void {
     world = World.init(allocator);
     world.addResource(resource.Clock{});
     world.addResource(resource.Inventory{});
-    world.addResource(resource.Map{});
     world.addResource(resource.Notice{});
     world.addResource(resource.Settings.load());
 

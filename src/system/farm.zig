@@ -58,7 +58,7 @@ fn useItem(world: *World, want: WantUse) void {
     const current = world.getResourcePtr(Map).?;
     // WantUse.item 是点击瞬间锁定的物品，不读取当前快捷栏状态。
     switch (want.item) {
-        .hoe => if (map.hoe(current, want.target)) {
+        .hoe => if (hoe(current, want.target)) {
             world.addEvent(event.SoundPlay{ .id = .hoe });
         },
         .water => water(world, current, want.target),
@@ -68,6 +68,20 @@ fn useItem(world: *World, want: WantUse) void {
         .pickaxe, .axe => hitProduct(world, current, want),
         .strawberry, .potato, .timber, .stone => unreachable,
     }
+}
+
+fn hoe(current: *Map, position: zhu.Vector2) bool {
+    const index = current.grid.worldToIndex(position) orelse return false;
+    const tile = &current.tiles[index];
+    if (tile.ground != null or tile.object != null) return false;
+    const marks = tile.marks;
+    if (!marks.contains(.arable)) return false;
+    if (marks.contains(.water)) return false;
+    if (marks.contains(.occupied)) return false;
+    const body: zhu.Shape = .{ .rect = current.grid.indexToRect(index) };
+    if (current.collision.overlaps(body)) return false;
+    tile.ground = .dry;
+    return true;
 }
 
 fn harvest(world: *World, current: *Map, position: zhu.Vector2) void {
@@ -88,19 +102,22 @@ fn harvest(world: *World, current: *Map, position: zhu.Vector2) void {
 }
 
 fn useSeed(world: *World, current: *Map, want: WantUse, kind: CropEnum) void {
-    if (!current.canPlant(want.target)) return;
+    const tile = current.getTile(want.target) orelse return;
+    if (tile.ground == null or tile.object != null) return;
+
     const inv = world.getResourcePtr(Inventory).?;
     if (!inv.use(want.item, 1)) return;
 
     const crop = factory.spawnCrop(world, want.target, kind);
-    current.getTile(want.target).?.set(.crop, crop);
+    tile.set(.crop, crop);
     world.addEvent(event.SoundPlay{ .id = .plant });
 }
 
 fn water(world: *World, current: *Map, position: zhu.Vector2) void {
-    if (!current.water(position)) return;
+    const tile = current.getTile(position) orelse return;
+    if (tile.ground == null) return;
+    tile.ground = .wet;
 
-    const tile = current.getTile(position).?;
     if (tile.get(.crop)) |entity| {
         world.getPtr(entity, Crop).?.watered = true;
     }
@@ -213,6 +230,40 @@ fn addProduct(world: *World, target: zhu.Vector2, product: Product) ecs.Entity {
     return entity;
 }
 
+test "锄地要求可耕作且没有地图阻挡语义" {
+    const gpa = std.testing.allocator;
+    const grid: zhu.extend.spatial.Grid = .{ .width = 1, .height = 1, .cellSide = 16 };
+    var tiles = [_]Map.Tile{.{}};
+    const tile = &tiles[0];
+    var current: Map = .{ .id = .school, .grid = grid, .tiles = &tiles };
+    current.collision.mask = try .init(gpa, grid);
+    defer current.collision.deinit(gpa);
+
+    const position = zhu.Vector2.xy(8, 8);
+    try std.testing.expect(!hoe(&current, position));
+
+    tile.marks.insert(.arable);
+    try std.testing.expect(hoe(&current, position));
+    try std.testing.expectEqual(.dry, tile.ground);
+    try std.testing.expect(!hoe(&current, position));
+    tile.ground = null;
+
+    tile.set(.crop, 0);
+    try std.testing.expect(!hoe(&current, position));
+    tile.object = null;
+
+    tile.marks.insert(.water);
+    try std.testing.expect(!hoe(&current, position));
+    tile.marks.remove(.water);
+
+    tile.marks.insert(.occupied);
+    try std.testing.expect(!hoe(&current, position));
+    tile.marks.remove(.occupied);
+
+    current.collision.setCellsInRect(grid.indexToRect(0));
+    try std.testing.expect(!hoe(&current, position));
+}
+
 test "toolHit 会按 WantUse 锄地" {
     const target = zhu.Vector2.xy(32, 48);
     var world = World.init(std.testing.allocator);
@@ -226,7 +277,7 @@ test "toolHit 会按 WantUse 锄地" {
 
     update(&world);
 
-    try std.testing.expect(current.canPlant(target));
+    try std.testing.expectEqual(.dry, current.getTile(target).?.ground);
     try std.testing.expect(!world.has(player, WantUse));
 
     const sounds = world.getEvent(event.SoundPlay);
@@ -246,7 +297,7 @@ test "非事件帧不会结算 WantUse" {
 
     update(&world);
 
-    try std.testing.expect(!current.canPlant(target));
+    try std.testing.expectEqual(null, current.getTile(target).?.ground);
     try std.testing.expect(world.has(player, WantUse));
 }
 
@@ -259,7 +310,7 @@ test "seedPlant 会种植并扣种子" {
 
     const inv = testInventory(&world);
     setActiveItem(&world, .strawberry_seed, 2);
-    try std.testing.expect(map.hoe(current, target));
+    current.getTile(target).?.ground = .dry;
 
     const player = world.createIdentity(Player);
     world.add(player, WantUse{
@@ -292,7 +343,7 @@ test "seedPlant 没有种子时不会种植" {
     defer map.unload(std.testing.allocator, &world);
 
     _ = testInventory(&world);
-    try std.testing.expect(map.hoe(current, target));
+    current.getTile(target).?.ground = .dry;
 
     const player = world.createIdentity(Player);
     world.add(player, WantUse{
@@ -341,7 +392,7 @@ test "seedPlant 已有作物时不扣种子" {
 
     const inv = testInventory(&world);
     setActiveItem(&world, .strawberry_seed, 2);
-    try std.testing.expect(map.hoe(current, target));
+    current.getTile(target).?.ground = .dry;
     const oldCrop = world.createEntity();
     world.add(oldCrop, Crop{ .kind = .potato });
     current.getTile(target).?.set(.crop, oldCrop);
@@ -376,7 +427,7 @@ test "浇水只作用于耕地并标记地里的作物" {
     try std.testing.expectEqual(null, tile.ground);
     try std.testing.expectEqual(0, world.getEvent(event.SoundPlay).len);
 
-    try std.testing.expect(map.hoe(current, target));
+    current.getTile(target).?.ground = .dry;
     const crop = world.createEntity();
     world.add(crop, Crop{});
     tile.set(.crop, crop);
@@ -566,7 +617,7 @@ test "sickle 会收获成熟作物并生成掉落物" {
     const current = loadTestMap(&world);
     defer map.unload(std.testing.allocator, &world);
 
-    try std.testing.expect(map.hoe(current, target));
+    current.getTile(target).?.ground = .dry;
     const crop = world.createEntity();
     world.add(crop, Crop{ .stage = .mature, .kind = .potato });
     current.getTile(target).?.set(.crop, crop);
@@ -596,7 +647,7 @@ test "hoe 不会收获成熟作物" {
     const current = loadTestMap(&world);
     defer map.unload(std.testing.allocator, &world);
 
-    try std.testing.expect(map.hoe(current, target));
+    current.getTile(target).?.ground = .dry;
     const crop = world.createEntity();
     world.add(crop, Crop{ .stage = .mature, .kind = .potato });
     current.getTile(target).?.set(.crop, crop);

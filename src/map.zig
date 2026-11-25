@@ -120,20 +120,6 @@ pub fn restore(gpa: std.mem.Allocator, saved: storage.MapRecord, day: u32) void 
     }
 }
 
-pub fn hoe(current: *Map, position: zhu.Vector2) bool {
-    const index = current.grid.worldToIndex(position) orelse return false;
-    const tile = &current.tiles[index];
-    if (tile.ground != null or tile.object != null) return false;
-    const marks = tile.marks;
-    if (!marks.contains(.arable)) return false;
-    if (marks.contains(.water)) return false;
-    if (marks.contains(.occupied)) return false;
-    const body: zhu.Shape = .{ .rect = current.grid.indexToRect(index) };
-    if (current.collision.overlaps(body)) return false;
-    tile.ground = .dry;
-    return true;
-}
-
 // 清除地图上的默认产出对象，并记录为 gone，避免后续恢复时重新生成。
 pub fn clearProduct(world: *World, position: zhu.Vector2) void {
     const current = world.getResourcePtr(Map).?;
@@ -604,13 +590,8 @@ test "对象层产出对象按碰撞范围占用格子" {
     defer current.deinit(std.testing.allocator);
     loader.load(std.testing.allocator, &world, testMap, current);
 
-    current.tiles[0].marks.insert(.arable);
-    current.tiles[1].marks.insert(.arable);
-
     const product = current.tiles[1].get(.product).?;
     try std.testing.expectEqual(null, current.tiles[0].object);
-    try std.testing.expect(hoe(current, .xy(8, 8)));
-    try std.testing.expect(!hoe(current, .xy(24, 8)));
 
     clearProduct(&world, testMap.grid.indexToWorld(1));
 
@@ -619,42 +600,4 @@ test "对象层产出对象按碰撞范围占用格子" {
     try std.testing.expectEqual(.none, current.tiles[0].gone);
     try std.testing.expectEqual(.product, current.tiles[1].gone);
     try std.testing.expect(!world.has(product, item.Product));
-}
-
-test "锄地要求可耕作且没有地图阻挡语义" {
-    const gpa = std.testing.allocator;
-    var world = ecs.World.init(gpa);
-    defer world.deinit();
-    const grid: spatial.Grid = .{ .width = 10, .height = 12, .cellSide = 16 };
-    load(gpa, &world, .{ .grid = grid });
-    defer unload(gpa, &world);
-    const current = world.getResourcePtr(Map).?;
-
-    const position = zhu.Vector2.xy(24, 40);
-    const index = grid.worldToIndex(position).?;
-
-    try std.testing.expect(!hoe(current, position));
-
-    const tile = &current.tiles[index];
-    tile.marks.insert(.arable);
-    try std.testing.expect(hoe(current, position));
-    try std.testing.expectEqual(.dry, tile.ground);
-    try std.testing.expect(!hoe(current, position));
-    tile.ground = null;
-
-    tile.set(.crop, world.createEntity());
-    try std.testing.expect(!hoe(current, position));
-    try std.testing.expectEqual(null, tile.ground);
-    tile.object = null;
-
-    tile.marks.insert(.water);
-    try std.testing.expect(!hoe(current, position));
-    tile.marks.remove(.water);
-
-    tile.marks.insert(.occupied);
-    try std.testing.expect(!hoe(current, position));
-    tile.marks.remove(.occupied);
-
-    current.collision.setCellsInRect(grid.indexToRect(index));
-    try std.testing.expect(!hoe(current, position));
 }
