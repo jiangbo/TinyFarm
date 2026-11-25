@@ -1,5 +1,5 @@
 .{
-    .cancelEvent = .cancel,
+    .cancelEvent = 3,
     .navKeys = .{ .cancel = .{ .ESCAPE, .P } },
     .overlay = .{ .r = 0, .g = 0, .b = 0, .a = 71 },
     .panel = .{
@@ -15,7 +15,7 @@
     .buttons = .{
         .{
             .label = "-",
-            .event = .minus,
+            .event = 0,
             .shape = .{ .rect = .{
                 .min = .{ .x = 50, .y = 66 },
                 .size = .{ .x = 48, .y = 32 },
@@ -55,7 +55,7 @@
         },
         .{
             .label = "+",
-            .event = .plus,
+            .event = 1,
             .shape = .{ .rect = .{
                 .min = .{ .x = 182, .y = 66 },
                 .size = .{ .x = 48, .y = 32 },
@@ -95,7 +95,7 @@
         },
         .{
             .label = "OK",
-            .event = .ok,
+            .event = 2,
             .shape = .{ .rect = .{
                 .min = .{ .x = 34, .y = 110 },
                 .size = .{ .x = 100, .y = 32 },
@@ -135,7 +135,7 @@
         },
         .{
             .label = "Cancel",
-            .event = .cancel,
+            .event = 3,
             .shape = .{ .rect = .{
                 .min = .{ .x = 146, .y = 110 },
                 .size = .{ .x = 100, .y = 32 },
