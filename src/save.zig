@@ -29,13 +29,6 @@ pub const Player = struct {
     facing: component.actor.Facing = .down,
 };
 
-pub const InventoryRecord = struct {
-    activeHotbar: usize = 0,
-    activePage: usize = 0,
-    slots: []const ?component.item.Stack = &.{},
-    hotbar: []const ?usize = &.{},
-};
-
 pub const Object = union(enum) {
     gone,
     crop: component.farm.Crop,
@@ -68,7 +61,7 @@ pub const Record = struct {
     timestamp: i64 = 0,
     clock: Clock = .{},
     player: Player = .{},
-    inventory: InventoryRecord = .{},
+    inventory: Inventory = .{},
     maps: MapRecord = .{},
     timeScale: f32 = 1,
 };
@@ -111,20 +104,18 @@ pub fn deinit(gpa: std.mem.Allocator) void {
 }
 
 fn capture(gpa: std.mem.Allocator, world: *const World) Record {
-    const clock = world.getResourcePtr(Clock).?;
-    const inv = world.getResourcePtr(Inventory).?;
     const player = world.getIdentity(actor.Player).?;
     const character = world.get(player, actor.Actor) orelse actor.Actor{};
 
     return .{
         .timestamp = zhu.timestamp().toSeconds(),
-        .clock = clock.*,
+        .clock = world.getResourcePtr(Clock).?.*,
         .player = .{
             .map = world.getResourcePtr(MapResource).?.id,
             .position = world.get(player, component.Position).?,
             .facing = character.facing,
         },
-        .inventory = captureInventory(inv),
+        .inventory = world.getResourcePtr(Inventory).?.*,
         .maps = captureMaps(gpa, world),
         .timeScale = world.getResourcePtr(Settings).?.timeScale,
     };
@@ -134,23 +125,7 @@ pub fn restore(gpa: std.mem.Allocator, world: *World, record: Record) void {
     world.getResourcePtr(Clock).?.* = record.clock;
     world.getResourcePtr(Settings).?.timeScale = record.timeScale;
     restoreMaps(gpa, record.maps, record.clock.day);
-    restoreInventory(world.getResourcePtr(Inventory).?, record.inventory);
-}
-
-fn captureInventory(inv: *const Inventory) InventoryRecord {
-    return .{
-        .activeHotbar = inv.activeHotbar,
-        .activePage = inv.activePage,
-        .slots = inv.store.stacks[0..],
-        .hotbar = inv.hotbar[0..],
-    };
-}
-
-fn restoreInventory(inv: *Inventory, data: InventoryRecord) void {
-    @memcpy(inv.store.stacks[0..], data.slots);
-    @memcpy(inv.hotbar[0..], data.hotbar);
-    inv.activeHotbar = data.activeHotbar;
-    inv.activePage = data.activePage;
+    world.getResourcePtr(Inventory).?.* = record.inventory;
 }
 
 pub fn resetMaps() void {
@@ -525,21 +500,4 @@ test "恢复已移除的产出对象时只清除它自己的阻挡" {
     try std.testing.expect(!world.has(entity, item.Product));
     try std.testing.expect(!current.collision.overlaps(productArea));
     try std.testing.expect(current.collision.overlaps(neighborArea));
-}
-
-test "背包恢复保留槽位、页面和快捷栏绑定" {
-    var original: Inventory = .{ .activeHotbar = 1, .activePage = 1 };
-    original.store.stacks[5] = .{ .item = .potato, .count = 7 };
-    original.hotbar[1] = 5;
-
-    var restored: Inventory = .{};
-    restored.store.stacks[0] = .{ .item = .strawberry, .count = 2 };
-    restored.hotbar[0] = 0;
-    restoreInventory(&restored, captureInventory(&original));
-
-    try std.testing.expectEqualDeep(original.store.stacks, restored.store.stacks);
-    try std.testing.expectEqualDeep(original.hotbar, restored.hotbar);
-    try std.testing.expectEqual(original.activePage, restored.activePage);
-    try std.testing.expectEqual(original.activeHotbar, restored.activeHotbar);
-    try std.testing.expectEqual(.potato, restored.active().?);
 }
