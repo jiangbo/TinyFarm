@@ -13,56 +13,71 @@ const Position = component.Position;
 const actor = component.actor;
 const item = component.item;
 const motion = component.motion;
+const Id = component.map.Id;
 const Trigger = component.map.Trigger;
 const SolidRange = component.map.SolidRange;
 
+const maps = tiled.bind(@import("../zon/tileSet.zon"), &.{
+    @import("../zon/maps/school.zon"),
+    @import("../zon/maps/town.zon"),
+    @import("../zon/maps/home_exterior.zon"),
+    @import("../zon/maps/home_interior.zon"),
+});
+
+pub fn definition(id: Id) *const tiled.Map {
+    return &maps[@backingInt(id)];
+}
+
 const Context = struct {
     gpa: std.mem.Allocator,
-    map: tiled.Map,
     world: *World,
-    current: *Map,
+    source: *const tiled.Map,
+    loaded: *Map,
 };
 
-pub fn load(gpa: std.mem.Allocator, world: *World, map: tiled.Map, out: *Map) void {
+pub fn load(gpa: std.mem.Allocator, world: *World, id: Id) Map {
+    const map = definition(id);
     const grid = map.grid;
-    if (map.getClass("ambient")) |ambient| {
-        out.props.indoorAmbient = .fromFloat(.{
-            .r = ambient.get("red", f32) orelse 1,
-            .g = ambient.get("green", f32) orelse 1,
-            .b = ambient.get("blue", f32) orelse 1,
-            .a = 1,
-        });
+    var loaded = Map.init(gpa, id, grid);
+    loaded.props.outdoor = switch (id) {
+        .town, .home_exterior => true,
+        .school, .home_interior => false,
+    };
+    if (!loaded.props.outdoor) {
+        if (map.getClass("ambient")) |ambient| {
+            loaded.props.indoorAmbient = .fromFloat(.{
+                .r = ambient.get("red", f32) orelse 1,
+                .g = ambient.get("green", f32) orelse 1,
+                .b = ambient.get("blue", f32) orelse 1,
+                .a = 1,
+            });
+        }
     }
-    out.collision.mask = spatial.SolidMask.init(gpa, .{
+    loaded.collision.mask = spatial.SolidMask.init(gpa, .{
         .width = grid.width * 2,
         .height = grid.height * 2,
         .cellSide = @divExact(grid.cellSide, 2),
     }) catch zhu.oom();
 
-    var ctx = Context{
-        .gpa = gpa,
-        .map = map,
-        .world = world,
-        .current = out,
-    };
-    parseLayers(&ctx);
+    parseLayers(&.{ .gpa = gpa, .world = world, .source = map, .loaded = &loaded });
     // 建表后不再追加矩形，销毁物件只需将对应矩形置空。
-    const index = spatial.StaticIndex.build(gpa, grid, out.areas.items);
-    out.collision.index = index catch zhu.oom();
-    out.collision.bounds = .init(.zero, grid.size());
+    const index = spatial.StaticIndex.build(gpa, grid, loaded.areas.items);
+    loaded.collision.index = index catch zhu.oom();
+    loaded.collision.bounds = .init(.zero, grid.size());
+    return loaded;
 }
 
-fn parseLayers(ctx: *Context) void {
+fn parseLayers(ctx: *const Context) void {
     var foundFrontLayer = false;
-    for (ctx.map.layers) |*layer| switch (layer.type) {
+    for (ctx.source.layers) |*layer| switch (layer.type) {
         .tile => if (layer.isNamed("solid")) {
             parseSolidLayer(ctx, layer);
         } else parseTileLayer(ctx, layer),
         .image => parseImageLayer(ctx, layer),
         .object => {
             if (!foundFrontLayer and layer.isNamed("main")) {
-                const start = ctx.current.vertexes.items.len;
-                ctx.current.frontStart = start;
+                const start = ctx.loaded.vertexes.items.len;
+                ctx.loaded.frontStart = start;
                 foundFrontLayer = true;
             }
             parseObjectLayer(ctx, layer);
@@ -70,24 +85,26 @@ fn parseLayers(ctx: *Context) void {
     };
 
     if (!foundFrontLayer) {
-        ctx.current.frontStart = ctx.current.vertexes.items.len;
+        ctx.loaded.frontStart = ctx.loaded.vertexes.items.len;
     }
 
     std.log.info("map loaded: {}x{}, tiles: {}", .{
-        ctx.map.grid.width,
-        ctx.map.grid.height,
-        ctx.current.vertexes.items.len,
+        ctx.loaded.grid.width,
+        ctx.loaded.grid.height,
+        ctx.loaded.vertexes.items.len,
     });
 }
 
-fn parseSolidLayer(ctx: *Context, layer: *const tiled.Layer) void {
-    const collision = &ctx.current.collision;
+fn parseSolidLayer(ctx: *const Context, layer: *const tiled.Layer) void {
+    const collision = &ctx.loaded.collision;
+    const grid = ctx.loaded.grid;
     for (layer.data, 0..) |gid, index| {
-        if (gid != 0) collision.setCellsInRect(ctx.map.grid.indexToRect(index));
+        if (gid != 0) collision.setCellsInRect(grid.indexToRect(index));
     }
 }
 
-fn parseTileLayer(ctx: *Context, layer: *const tiled.Layer) void {
+fn parseTileLayer(ctx: *const Context, layer: *const tiled.Layer) void {
+    const map = ctx.source;
     const rockLayer = layer.isNamed("rock");
     for (layer.data, 0..) |globalId, index| {
         if (globalId == 0) continue; // 0 表示空瓦片，跳过
@@ -96,33 +113,33 @@ fn parseTileLayer(ctx: *Context, layer: *const tiled.Layer) void {
             loadRockTile(ctx, globalId, index);
             continue;
         }
-        if (ctx.map.getImage(globalId)) |image| {
-            const position = ctx.map.grid.indexToWorld(index);
-            if (ctx.map.getAnimation(globalId)) |animation| {
-                ctx.current.animatedTiles.append(ctx.gpa, .{
-                    .vertex = ctx.current.vertexes.items.len,
+        if (map.getImage(globalId)) |image| {
+            const position = ctx.loaded.grid.indexToWorld(index);
+            if (map.getAnimation(globalId)) |animation| {
+                ctx.loaded.animatedTiles.append(ctx.gpa, .{
+                    .vertex = ctx.loaded.vertexes.items.len,
                     .animation = animation,
                 }) catch zhu.oom();
                 addImage(ctx, position, animation.subImage());
             } else addImage(ctx, position, image);
         }
 
-        const tile = ctx.map.getTile(globalId) orelse continue;
+        const tile = map.getTile(globalId) orelse continue;
         if (tile.getProperty("tile_flag", []const u8)) |flag| {
             loadFlags(ctx, index, flag);
         }
     }
 }
 
-fn loadRockTile(ctx: *Context, globalId: u32, index: usize) void {
-    const rect = ctx.current.grid.indexToRect(index);
-    const entity = factory.spawnMapTile(ctx.world, ctx.map, globalId, rect);
+fn loadRockTile(ctx: *const Context, globalId: u32, index: usize) void {
+    const rect = ctx.loaded.grid.indexToRect(index);
+    const entity = factory.spawnMapTile(ctx.world, ctx.source.*, globalId, rect);
     if (!ctx.world.has(entity, item.Product)) return;
 
-    const start = ctx.current.areas.items.len;
+    const start = ctx.loaded.areas.items.len;
     addSolidRect(ctx, rect);
     ctx.world.add(entity, SolidRange{ .start = start, .count = 1 });
-    ctx.current.tiles[index].set(.product, entity);
+    ctx.loaded.tiles[index].set(.product, entity);
 }
 
 const TileFlag = enum {
@@ -138,8 +155,8 @@ const TileFlag = enum {
     OCCUPIED,
 };
 
-fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
-    const tile = ctx.map.grid.indexToRect(index);
+fn loadFlags(ctx: *const Context, index: usize, flags: []const u8) void {
+    const tile = ctx.loaded.grid.indexToRect(index);
     const half = tile.size.x * 0.5;
     var iter = std.mem.tokenizeScalar(u8, flags, ',');
     while (iter.next()) |raw| {
@@ -153,7 +170,7 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
             .BLOCK_W => .init(tile.min, .xy(half, tile.size.y)),
             .BLOCK_E => .init(tile.min.addX(half), .xy(half, tile.size.y)),
             else => {
-                ctx.current.tiles[index].marks.insert(switch (flag) {
+                ctx.loaded.tiles[index].marks.insert(switch (flag) {
                     .HAZARD => .hazard,
                     .WATER => .water,
                     .INTERACT => .interact,
@@ -164,18 +181,18 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
                 continue;
             },
         };
-        ctx.current.collision.setCellsInRect(rect);
+        ctx.loaded.collision.setCellsInRect(rect);
     }
 }
 
-fn parseImageLayer(ctx: *Context, layer: *const tiled.Layer) void {
+fn parseImageLayer(ctx: *const Context, layer: *const tiled.Layer) void {
     const image = zhu.assets.getImage(layer.image).?
         .sub(.init(.zero, .xy(layer.width, layer.height)));
     addImage(ctx, layer.offset, image);
 }
 
-fn addImage(ctx: *Context, position: zhu.Vector2, image: zhu.Image) void {
-    ctx.current.vertexes.append(ctx.gpa, .{
+fn addImage(ctx: *const Context, position: zhu.Vector2, image: zhu.Image) void {
+    ctx.loaded.vertexes.append(ctx.gpa, .{
         .position = position,
         .layer = image.layer,
         .size = image.size,
@@ -183,7 +200,7 @@ fn addImage(ctx: *Context, position: zhu.Vector2, image: zhu.Image) void {
     }) catch zhu.oom();
 }
 
-fn parseObjectLayer(ctx: *Context, layer: *const tiled.Layer) void {
+fn parseObjectLayer(ctx: *const Context, layer: *const tiled.Layer) void {
     if (layer.isNamed("collider")) {
         for (layer.objects) |object| {
             addSolidRect(ctx, object.rect());
@@ -194,7 +211,7 @@ fn parseObjectLayer(ctx: *Context, layer: *const tiled.Layer) void {
     for (layer.objects) |object| loadObject(ctx, object);
 }
 
-fn loadObject(ctx: *Context, object: tiled.Object) void {
+fn loadObject(ctx: *const Context, object: tiled.Object) void {
     if (object.point and object.isType("actor")) {
         return loadActor(ctx, object);
     }
@@ -209,7 +226,7 @@ fn loadObject(ctx: *Context, object: tiled.Object) void {
     if (object.gid != 0) return loadProp(ctx, object);
 }
 
-fn loadActor(ctx: *Context, object: tiled.Object) void {
+fn loadActor(ctx: *const Context, object: tiled.Object) void {
     // player 由 scene 统一创建，地图中的点只作为 Tiled 标记保留。
     if (object.isNamed("player")) return;
 
@@ -223,7 +240,7 @@ fn loadActor(ctx: *Context, object: tiled.Object) void {
     std.debug.panic("unknown actor object: {s}", .{object.name});
 }
 
-fn loadAnimal(ctx: *Context, object: tiled.Object) void {
+fn loadAnimal(ctx: *const Context, object: tiled.Object) void {
     // animal 是没有 gid 的 Tiled 点对象，name 直接对应 AnimalEnum。
     const kind = zhu.enums.to(actor.AnimalEnum, object.name);
     const entity = factory.spawnAnimal(ctx.world, kind);
@@ -232,7 +249,7 @@ fn loadAnimal(ctx: *Context, object: tiled.Object) void {
     ctx.world.getPtr(entity, actor.Wander).?.home = object.position;
 }
 
-fn loadTrigger(ctx: *Context, object: tiled.Object) void {
+fn loadTrigger(ctx: *const Context, object: tiled.Object) void {
     std.debug.assert(object.size.x > 0 and object.size.y > 0);
 
     const target = object.getProperty("target_map", []const u8).?;
@@ -252,7 +269,7 @@ fn loadTrigger(ctx: *Context, object: tiled.Object) void {
     _ = factory.spawnMapTrigger(ctx.world, trigger);
 }
 
-fn loadRest(ctx: *Context, object: tiled.Object) void {
+fn loadRest(ctx: *const Context, object: tiled.Object) void {
     const entity = ctx.world.createEntity();
     ctx.world.add(entity, object.position);
     ctx.world.add(entity, component.actor.Interact{});
@@ -262,8 +279,8 @@ fn loadRest(ctx: *Context, object: tiled.Object) void {
     });
 }
 
-fn loadProp(ctx: *Context, object: tiled.Object) void {
-    const entity = factory.spawnMapObject(ctx.world, ctx.map, object);
+fn loadProp(ctx: *const Context, object: tiled.Object) void {
+    const entity = factory.spawnMapObject(ctx.world, ctx.source.*, object);
     const solid = addSolidObject(ctx, object);
     if (ctx.world.has(entity, item.Chest)) {
         const rect = object.rect();
@@ -272,13 +289,13 @@ fn loadProp(ctx: *Context, object: tiled.Object) void {
             .rect = rect.move(position.neg()),
         });
 
-        const tile = ctx.current.getTile(rect.center()).?;
+        const tile = ctx.loaded.getTile(rect.center()).?;
         tile.object = .{ .kind = .chest, .entity = entity };
     }
     if (ctx.world.has(entity, item.Product)) {
         if (solid.count != 0) {
             // 树这类对象按碰撞范围登记，不按更大的显示范围登记。
-            for (ctx.current.solidAreas(solid)) |area| {
+            for (ctx.loaded.solidAreas(solid)) |area| {
                 setProductTiles(ctx, entity, area);
             }
         } else {
@@ -290,14 +307,14 @@ fn loadProp(ctx: *Context, object: tiled.Object) void {
     }
 }
 
-fn addSolidRect(ctx: *Context, rect: zhu.Rect) void {
+fn addSolidRect(ctx: *const Context, rect: zhu.Rect) void {
     std.debug.assert(rect.size.x > 0 and rect.size.y > 0);
-    ctx.current.areas.append(ctx.gpa, rect) catch zhu.oom();
+    ctx.loaded.areas.append(ctx.gpa, rect) catch zhu.oom();
 }
 
-fn addSolidObject(ctx: *Context, object: tiled.Object) SolidRange {
-    const start = ctx.current.areas.items.len;
-    const tile = ctx.map.getTile(object.gid) orelse
+fn addSolidObject(ctx: *const Context, object: tiled.Object) SolidRange {
+    const start = ctx.loaded.areas.items.len;
+    const tile = ctx.source.getTile(object.gid) orelse
         return .{ .start = start, .count = 0 };
     const group = tile.objectGroup orelse
         return .{ .start = start, .count = 0 };
@@ -309,11 +326,11 @@ fn addSolidObject(ctx: *Context, object: tiled.Object) SolidRange {
     }
     return .{
         .start = start,
-        .count = ctx.current.areas.items.len - start,
+        .count = ctx.loaded.areas.items.len - start,
     };
 }
 
-fn loadLight(ctx: *Context, object: tiled.Object) void {
+fn loadLight(ctx: *const Context, object: tiled.Object) void {
     if (object.isNamed("point")) {
         _ = factory.spawnPointLight(ctx.world, object);
         return;
@@ -330,9 +347,87 @@ fn loadLight(ctx: *Context, object: tiled.Object) void {
 }
 
 // 对象层产出按碰撞范围登记；没有碰撞范围时退回到传入矩形。
-fn setProductTiles(ctx: *Context, entity: ecs.Entity, rect: zhu.Rect) void {
-    var iter = ctx.map.grid.indicesInRect(rect);
+fn setProductTiles(ctx: *const Context, entity: ecs.Entity, rect: zhu.Rect) void {
+    var iter = ctx.loaded.grid.indicesInRect(rect);
     while (iter.next()) |index| {
-        ctx.current.tiles[index].set(.product, entity);
+        ctx.loaded.tiles[index].set(.product, entity);
     }
+}
+
+test "对象层产出对象按碰撞范围占用格子" {
+    const imageId = 4321;
+    const tileSetId = 8765;
+
+    const treeProps = [_]tiled.Property{
+        .{ .name = "obj_type", .value = .{ .string = "tree" } },
+        .{ .name = "anim_id", .value = .{ .string = "axe" } },
+    };
+    const collisionObjects = [_]tiled.Object{.{
+        .id = 1,
+        .gid = 0,
+        .name = "",
+        .type = "",
+        .position = .xy(16, 0),
+        .size = .xy(16, 16),
+        .point = false,
+        .properties = &.{},
+        .extend = .{},
+    }};
+    const objectGroup = tiled.ObjectGroup{
+        .visible = true,
+        .objects = &collisionObjects,
+    };
+    const tiles = [_]tiled.Tile{.{
+        .id = 0,
+        .objectGroup = objectGroup,
+        .properties = &treeProps,
+        .animation = &.{},
+    }};
+    const testTileSets = [_]tiled.TileSet{.{
+        .id = tileSetId,
+        .columns = 1,
+        .tileCount = 1,
+        .image = imageId,
+        .tileSize = .xy(16, 16),
+        .tiles = &tiles,
+    }};
+    const objects = [_]tiled.Object{.{
+        .id = 1,
+        .gid = 0x01000000,
+        .name = "",
+        .type = "",
+        .position = .xy(0, 16),
+        .size = .xy(32, 16),
+        .point = false,
+        .properties = &.{},
+        .extend = .{},
+    }};
+    const layers = [_]tiled.Layer{.{
+        .id = 1,
+        .name = "main",
+        .image = 0,
+        .type = .object,
+        .width = 0,
+        .height = 0,
+        .offset = .zero,
+        .data = &.{},
+        .objects = &objects,
+    }};
+    const data = tiled.Map{
+        .grid = .{ .width = 3, .height = 1, .cellSide = 16 },
+        .layers = &layers,
+        .tileSets = &testTileSets,
+    };
+
+    const gpa = std.testing.allocator;
+    var world = ecs.World.init(gpa);
+    defer world.deinit();
+
+    var current = Map.init(gpa, .school, data.grid);
+    defer current.deinit(gpa);
+    parseLayers(&.{ .gpa = gpa, .world = &world, .source = &data, .loaded = &current });
+
+    try std.testing.expectEqual(null, current.tiles[0].object);
+    try std.testing.expect(current.tiles[1].get(.product) != null);
+    try std.testing.expectEqual(null, current.tiles[2].object);
 }

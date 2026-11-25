@@ -8,7 +8,6 @@ const Map = @This();
 const Allocator = std.mem.Allocator;
 const Entity = ecs.Entity;
 const spatial = zhu.extend.spatial;
-const Grid = spatial.Grid;
 const farm = component.farm;
 const SolidRange = component.map.SolidRange;
 const AnimatedTile = struct { vertex: usize, animation: zhu.Animation };
@@ -44,8 +43,8 @@ pub const Tile = struct {
     }
 };
 
-id: component.map.Id = .school,
-grid: Grid = undefined,
+id: component.map.Id,
+grid: spatial.Grid = undefined,
 props: struct {
     outdoor: bool = false,
     indoorAmbient: zhu.Color = .white,
@@ -57,20 +56,18 @@ vertexes: std.ArrayList(zhu.Vertex) = .empty,
 animatedTiles: std.ArrayList(AnimatedTile) = .empty,
 frontStart: usize = 0,
 
-pub fn init(gpa: Allocator, grid: Grid) Map {
+pub fn init(gpa: Allocator, id: component.map.Id, grid: spatial.Grid) Map {
     const tiles = gpa.alloc(Tile, grid.count()) catch zhu.oom();
     @memset(tiles, .{});
-    return .{ .grid = grid, .tiles = tiles };
+    return .{ .id = id, .grid = grid, .tiles = tiles };
 }
 
 pub fn deinit(self: *Map, gpa: Allocator) void {
     gpa.free(self.tiles);
-    self.tiles = &.{};
     self.collision.deinit(gpa);
     self.areas.clearAndFree(gpa);
     self.vertexes.clearAndFree(gpa);
     self.animatedTiles.clearAndFree(gpa);
-    self.frontStart = 0;
 }
 
 pub fn advanceAnimations(self: *Map, delta: f32) void {

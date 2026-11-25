@@ -9,7 +9,6 @@ const storage = @import("storage.zig");
 const Clock = @import("resource/Clock.zig");
 const Map = @import("resource/Map.zig");
 
-const tiled = zhu.extend.tiled;
 const spatial = zhu.extend.spatial;
 const World = ecs.World;
 const Entity = ecs.Entity;
@@ -25,31 +24,21 @@ pub const Id = component.map.Id;
 pub const StartOffset = component.map.StartOffset;
 pub const Hit = component.map.Hit;
 
-const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
-    @import("zon/maps/school.zon"),
-    @import("zon/maps/town.zon"),
-    @import("zon/maps/home_exterior.zon"),
-    @import("zon/maps/home_interior.zon"),
-});
-
 var states: std.EnumArray(Id, SaveMap) = .initFill(.{});
 
-pub fn deinit(gpa: std.mem.Allocator, world: *const World) void {
+pub fn deinit(gpa: std.mem.Allocator, world: *World) void {
     unload(gpa, world);
-    for (std.enums.values(Id)) |id| {
-        gpa.free(states.get(id).tiles);
+    for (&states.values) |*state| {
+        gpa.free(state.tiles);
+        state.* = .{};
     }
 }
 
 pub fn enter(gpa: std.mem.Allocator, world: *World, id: Id) void {
-    load(gpa, world, maps[@backingInt(id)]);
-    const current = world.getResourcePtr(Map).?;
-    current.id = id;
-    current.props.outdoor = switch (id) {
-        .town, .home_exterior => true,
-        .school, .home_interior => false,
-    };
-    restoreCurrent(gpa, world);
+    var current = loader.load(gpa, world, id);
+    restoreCurrent(gpa, world, &current);
+    world.addResource(current);
+    zhu.camera.bound = current.grid.size();
 
     // 原始地图没有住宅室外与城镇的连接，由游戏补充。
     const trigger: component.map.Trigger = switch (id) {
@@ -72,20 +61,15 @@ pub fn enter(gpa: std.mem.Allocator, world: *World, id: Id) void {
     _ = factory.spawnMapTrigger(world, trigger);
 }
 
-pub fn exit(gpa: std.mem.Allocator, world: *const World) void {
+pub fn exit(gpa: std.mem.Allocator, world: *World) void {
     saveCurrent(gpa, world);
     unload(gpa, world);
 }
 
-pub fn load(gpa: std.mem.Allocator, world: *World, mapData: tiled.Map) void {
-    world.addResource(Map.init(gpa, mapData.grid));
-    zhu.camera.bound = mapData.grid.size();
-    loader.load(gpa, world, mapData, world.getResourcePtr(Map).?);
-}
-
-pub fn unload(gpa: std.mem.Allocator, world: *const World) void {
+pub fn unload(gpa: std.mem.Allocator, world: *World) void {
     const current = world.getResourcePtr(Map) orelse return;
     current.deinit(gpa);
+    world.removeResource(Map);
 }
 
 pub fn resetState() void {
@@ -144,9 +128,8 @@ fn saveCurrent(gpa: std.mem.Allocator, world: *const World) void {
     state.day = day;
 }
 
-fn restoreCurrent(gpa: std.mem.Allocator, world: *World) void {
-    const day = world.getResourcePtr(Clock).?.*.day;
-    const current = world.getResourcePtr(Map).?;
+fn restoreCurrent(gpa: std.mem.Allocator, world: *World, current: *Map) void {
+    const day = world.getResourcePtr(Clock).?.day;
     const state = ensure(gpa, current.id, current.tiles.len, day);
     advanceState(state, day);
 
@@ -155,7 +138,7 @@ fn restoreCurrent(gpa: std.mem.Allocator, world: *World) void {
         tile.ground = saved.ground;
 
         const object = saved.object orelse continue;
-        restoreObject(world, index, object);
+        restoreObject(world, current, index, object);
     }
 
     state.day = day;
@@ -187,7 +170,7 @@ fn captureTiles(gpa: std.mem.Allocator, state: *const SaveMap) []Tile {
 }
 
 fn restoreMap(gpa: std.mem.Allocator, id: Id, saved: SaveMap, day: u32) void {
-    const mapData = &maps[@backingInt(id)];
+    const mapData = loader.definition(id);
     const count = mapData.grid.count();
     const state = ensure(gpa, id, count, day);
 
@@ -212,8 +195,7 @@ fn objectAt(world: *const World, tile: Map.Tile) ?Object {
     };
 }
 
-fn restoreObject(world: *World, index: usize, data: Object) void {
-    const current = world.getResourcePtr(Map).?;
+fn restoreObject(world: *World, current: *Map, index: usize, data: Object) void {
     switch (data) {
         .gone => clearProductIndex(world, current, index),
         .crop => |crop| {
@@ -371,11 +353,13 @@ test "湿地离线跨天只加速一天" {
     );
 }
 
+const testGrid: spatial.Grid = .{ .width = 10, .height = 12, .cellSide = 16 };
+
 test "当前地图和离线地图跨天推进规则一致" {
     const gpa = std.testing.allocator;
     var world = ecs.World.init(gpa);
     defer world.deinit();
-    world.addResource(Map.init(gpa, maps[0].grid));
+    world.addResource(Map.init(gpa, .school, testGrid));
     const current = world.getResourcePtr(Map).?;
     defer current.deinit(gpa);
 
@@ -422,7 +406,7 @@ test "恢复已打开宝箱会移除动画组件" {
     const gpa = std.testing.allocator;
     var world = ecs.World.init(gpa);
     defer world.deinit();
-    world.addResource(Map.init(gpa, maps[0].grid));
+    world.addResource(Map.init(gpa, .school, testGrid));
     const current = world.getResourcePtr(Map).?;
     defer current.deinit(gpa);
 
@@ -438,7 +422,7 @@ test "恢复已打开宝箱会移除动画组件" {
     world.add(chest, render.Sprite{ .image = image });
     current.tiles[0].object = .{ .kind = .chest, .entity = chest };
 
-    restoreObject(&world, 0, .{ .chest = .{ .opened = true } });
+    restoreObject(&world, current, 0, .{ .chest = .{ .opened = true } });
 
     try std.testing.expect(world.get(chest, item.Chest).?.opened);
     try std.testing.expect(!world.has(chest, actor.Animation));
@@ -452,7 +436,7 @@ test "恢复地图产出对象只写回生命" {
     const gpa = std.testing.allocator;
     var world = ecs.World.init(gpa);
     defer world.deinit();
-    world.addResource(Map.init(gpa, maps[0].grid));
+    world.addResource(Map.init(gpa, .school, testGrid));
     const current = world.getResourcePtr(Map).?;
     defer current.deinit(gpa);
 
@@ -460,7 +444,7 @@ test "恢复地图产出对象只写回生命" {
     world.add(entity, item.Product{ .drop = .one(.stone), .health = 1 });
     current.tiles[0].object = .{ .kind = .product, .entity = entity };
 
-    restoreObject(&world, 0, .{ .product = 4 });
+    restoreObject(&world, current, 0, .{ .product = 4 });
 
     const product = world.get(entity, item.Product).?;
     try std.testing.expectEqual(.stone, product.drop.item);
@@ -473,30 +457,14 @@ test "恢复已移除的产出对象时只清除它自己的阻挡" {
     var world = ecs.World.init(gpa);
     defer world.deinit();
 
-    var objects: [2]tiled.Object = @splat(.{
-        .id = 1,
-        .gid = 0,
-        .name = "",
-        .type = "",
-        .position = .xy(4, 0),
-        .size = .xy(4, 16),
-        .point = false,
-        .properties = &.{},
-        .extend = .{},
+    var current = Map.init(gpa, .school, testGrid);
+    defer current.deinit(gpa);
+    try current.areas.appendSlice(gpa, &.{
+        .init(.xy(4, 0), .xy(4, 16)),
+        .init(.xy(8, 0), .xy(4, 16)),
     });
-    objects[1].id = 2;
-    objects[1].position.x = 8;
-    load(gpa, &world, .{ .grid = maps[0].grid, .layers = &.{.{
-        .id = 1,
-        .name = "collider",
-        .image = 0,
-        .type = .object,
-        .offset = .zero,
-        .data = &.{},
-        .objects = &objects,
-    }} });
-    defer unload(gpa, &world);
-    const current = world.getResourcePtr(Map).?;
+    const areas = current.areas.items;
+    current.collision.index = try spatial.StaticIndex.build(gpa, testGrid, areas);
 
     const entity = world.createEntity();
     world.add(entity, item.Product{ .drop = .one(.stone), .health = 1 });
@@ -508,96 +476,11 @@ test "恢复已移除的产出对象时只清除它自己的阻挡" {
     try std.testing.expect(current.collision.overlaps(productArea));
     try std.testing.expect(current.collision.overlaps(neighborArea));
 
-    restoreObject(&world, 0, .gone);
+    restoreObject(&world, &current, 0, .gone);
 
     try std.testing.expectEqual(null, current.tiles[0].object);
     try std.testing.expectEqual(.product, current.tiles[0].gone);
     try std.testing.expect(!world.has(entity, item.Product));
     try std.testing.expect(!current.collision.overlaps(productArea));
     try std.testing.expect(current.collision.overlaps(neighborArea));
-}
-
-test "对象层产出对象按碰撞范围占用格子" {
-    const imageId = 4321;
-    const tileSetId = 8765;
-
-    const treeProps = [_]tiled.Property{
-        .{ .name = "obj_type", .value = .{ .string = "tree" } },
-        .{ .name = "anim_id", .value = .{ .string = "axe" } },
-    };
-    const collisionObjects = [_]tiled.Object{.{
-        .id = 1,
-        .gid = 0,
-        .name = "",
-        .type = "",
-        .position = .xy(16, 0),
-        .size = .xy(16, 16),
-        .point = false,
-        .properties = &.{},
-        .extend = .{},
-    }};
-    const objectGroup = tiled.ObjectGroup{
-        .visible = true,
-        .objects = &collisionObjects,
-    };
-    const tiles = [_]tiled.Tile{.{
-        .id = 0,
-        .objectGroup = objectGroup,
-        .properties = &treeProps,
-        .animation = &.{},
-    }};
-    const testTileSets = [_]tiled.TileSet{.{
-        .id = tileSetId,
-        .columns = 1,
-        .tileCount = 1,
-        .image = imageId,
-        .tileSize = .xy(16, 16),
-        .tiles = &tiles,
-    }};
-    const objects = [_]tiled.Object{.{
-        .id = 1,
-        .gid = 0x01000000,
-        .name = "",
-        .type = "",
-        .position = .xy(0, 16),
-        .size = .xy(32, 16),
-        .point = false,
-        .properties = &.{},
-        .extend = .{},
-    }};
-    const layers = [_]tiled.Layer{.{
-        .id = 1,
-        .name = "main",
-        .image = 0,
-        .type = .object,
-        .width = 0,
-        .height = 0,
-        .offset = .zero,
-        .data = &.{},
-        .objects = &objects,
-    }};
-    const testMap = tiled.Map{
-        .grid = .{ .width = 3, .height = 1, .cellSide = 16 },
-        .layers = &layers,
-        .tileSets = &testTileSets,
-    };
-
-    var world = ecs.World.init(std.testing.allocator);
-    defer world.deinit();
-
-    world.addResource(Map.init(std.testing.allocator, testMap.grid));
-    const current = world.getResourcePtr(Map).?;
-    defer current.deinit(std.testing.allocator);
-    loader.load(std.testing.allocator, &world, testMap, current);
-
-    const product = current.tiles[1].get(.product).?;
-    try std.testing.expectEqual(null, current.tiles[0].object);
-
-    clearProduct(&world, testMap.grid.indexToWorld(1));
-
-    try std.testing.expectEqual(null, current.tiles[0].object);
-    try std.testing.expectEqual(null, current.tiles[1].object);
-    try std.testing.expectEqual(.none, current.tiles[0].gone);
-    try std.testing.expectEqual(.product, current.tiles[1].gone);
-    try std.testing.expect(!world.has(product, item.Product));
 }

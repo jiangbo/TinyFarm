@@ -160,55 +160,15 @@ fn toolSound(tool: ItemEnum) component.sound.Id {
     };
 }
 
-const testMap = zhu.extend.tiled.Map{
-    .grid = .{ .width = 4, .height = 5, .cellSide = 16 },
-    .layers = &.{.{
-        .id = 1,
-        .name = "ground",
-        .image = 0,
-        .type = .tile,
-        .offset = .zero,
-        .data = &.{
-            0, 0, 0,          0,
-            0, 0, 0,          0,
-            0, 0, 0,          0,
-            0, 0, 0x01000000, 0x01000001,
-            0, 0, 0,          0,
-        },
-        .objects = &.{},
-    }},
-    .tileSets = &.{.{
-        .id = 1,
-        .columns = 1,
-        .tileCount = 1,
-        .image = 0,
-        .tileSize = .xy(16, 16),
-        .tiles = &.{
-            .{
-                .id = 0,
-                .objectGroup = null,
-                .properties = &.{.{
-                    .name = "tile_flag",
-                    .value = .{ .string = "ARABLE" },
-                }},
-                .animation = &.{},
-            },
-            .{
-                .id = 1,
-                .objectGroup = null,
-                .properties = &.{.{
-                    .name = "tile_flag",
-                    .value = .{ .string = "ARABLE,SOLID" },
-                }},
-                .animation = &.{},
-            },
-        },
-    }},
-};
-
 fn loadTestMap(world: *World) *Map {
-    map.load(std.testing.allocator, world, testMap);
-    return world.getResourcePtr(Map).?;
+    world.addResource(Map.init(std.testing.allocator, .school, .{
+        .width = 4,
+        .height = 5,
+        .cellSide = 16,
+    }));
+    const current = world.getResourcePtr(Map).?;
+    current.getTile(.xy(32, 48)).?.marks.insert(.arable);
+    return current;
 }
 
 fn testInventory(world: *World) *Inventory {
