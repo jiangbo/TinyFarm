@@ -247,8 +247,11 @@ fn loadObject(ctx: *const Context, object: tiled.Object) void {
 }
 
 fn loadActor(ctx: *const Context, object: tiled.Object) void {
-    // player 由 scene 统一创建，地图中的点只作为 Tiled 标记保留。
-    if (object.isNamed("player")) return;
+    if (object.isNamed("player")) {
+        std.debug.assert(ctx.loaded.props.playerSpawn == null);
+        ctx.loaded.props.playerSpawn = object.position;
+        return;
+    }
 
     if (object.isNamed("friend")) {
         const entity = factory.spawnFriend(ctx.world);

@@ -48,6 +48,7 @@ grid: spatial.Grid = undefined,
 props: struct {
     outdoor: bool = false,
     indoorAmbient: zhu.Color = .white,
+    playerSpawn: ?zhu.Vector2 = null,
 } = .{},
 tiles: []Tile = &.{},
 collision: spatial.Static = .{},

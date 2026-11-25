@@ -141,7 +141,7 @@ fn updateMapFade(delta: f32) bool {
             const request = world.get(playerEntity, Transition).?;
             exitMap();
             enterMap(request.target);
-            spawnPlayer(request.targetId);
+            spawnPlayer(triggerPosition(request.targetId), .down);
             system.light.update(&world);
             system.sort.update(&world);
             mapFade.fadeIn();
@@ -193,9 +193,10 @@ fn enterPlay(loadSlot: ?u8) void {
     world.getResourcePtr(resource.Settings).?.lightOn = false;
     save.resetMaps();
 
-    resetWorld();
+    world.resetKeepResources();
     enterMap(.home_exterior);
-    spawnPlayer(-1);
+    const loaded = world.getResourcePtr(resource.Map).?;
+    spawnPlayer(loaded.props.playerSpawn.?, .down);
     system.light.update(&world);
     system.sort.update(&world);
     const inv = world.getResourcePtr(resource.Inventory).?;
@@ -230,10 +231,9 @@ fn load(slot: u8) bool {
     world.getResourcePtr(resource.Notice).?.reset();
     world.getResourcePtr(resource.Settings).?.lightOn = false;
 
-    resetWorld();
+    world.resetKeepResources();
     enterMap(player.map);
-    factory.spawnPlayer(&world, player.position, player.facing);
-    zhu.camera.directFollow(player.position);
+    spawnPlayer(player.position, player.facing);
     system.light.update(&world);
     system.sort.update(&world);
     ui.resetInventory();
@@ -250,7 +250,7 @@ fn enterMap(id: component.map.Id) void {
 fn exitMap() void {
     save.captureMap(allocator, &world);
     unloadMap();
-    resetWorld();
+    world.resetKeepResources();
 }
 
 fn unloadMap() void {
@@ -259,33 +259,26 @@ fn unloadMap() void {
     world.removeResource(resource.Map);
 }
 
-fn spawnPlayer(targetId: i32) void {
-    var position: zhu.Vector2 = .xy(311, 168);
-    var query = world.query(.{Trigger});
-    while (query.next()) |row| {
-        const trigger = row.get(Trigger);
-        if (trigger.selfId == targetId) {
-            position = triggerPosition(trigger);
-            break;
-        }
-    }
-    factory.spawnPlayer(&world, position, .down);
+fn spawnPlayer(position: zhu.Vector2, facing: actor.Facing) void {
+    factory.spawnPlayer(&world, position, facing);
     zhu.camera.directFollow(position);
 }
 
-fn triggerPosition(trigger: Trigger) zhu.Vector2 {
-    const offset = 8;
-    const center = trigger.rect.center();
-    return switch (trigger.startOffset) {
-        .left => .xy(trigger.rect.min.x - offset, center.y),
-        .right => .xy(trigger.rect.max().x + offset, center.y),
-        .top => .xy(center.x, trigger.rect.min.y - offset),
-        .bottom => .xy(center.x, trigger.rect.max().y + offset),
-        .none => center,
-    };
-}
+fn triggerPosition(targetId: i32) zhu.Vector2 {
+    var query = world.query(.{Trigger});
+    while (query.next()) |row| {
+        const trigger = row.get(Trigger);
+        if (trigger.selfId != targetId) continue;
 
-fn resetWorld() void {
-    // 重建世界时保留全部资源。
-    world.resetKeepResources();
+        const offset = 8;
+        const center = trigger.rect.center();
+        return switch (trigger.startOffset) {
+            .left => .xy(trigger.rect.min.x - offset, center.y),
+            .right => .xy(trigger.rect.max().x + offset, center.y),
+            .top => .xy(center.x, trigger.rect.min.y - offset),
+            .bottom => .xy(center.x, trigger.rect.max().y + offset),
+            .none => center,
+        };
+    }
+    std.debug.panic("missing map trigger {}", .{targetId});
 }
