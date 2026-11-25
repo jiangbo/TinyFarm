@@ -73,28 +73,6 @@ pub fn deinit(self: *Map, gpa: Allocator) void {
     self.frontStart = 0;
 }
 
-pub fn addImage(self: *Map, gpa: Allocator, pos: zhu.Vector2, image: zhu.Image) void {
-    self.vertexes.append(gpa, .{
-        .position = pos,
-        .layer = image.layer,
-        .size = image.size,
-        .uvRect = image.uvRect(),
-    }) catch zhu.oom();
-}
-
-pub fn addAnimatedTile(
-    self: *Map,
-    gpa: Allocator,
-    position: zhu.Vector2,
-    animation: zhu.Animation,
-) void {
-    self.animatedTiles.append(gpa, .{
-        .vertex = self.vertexes.items.len,
-        .animation = animation,
-    }) catch zhu.oom();
-    self.addImage(gpa, position, animation.subImage());
-}
-
 pub fn advanceAnimations(self: *Map, delta: f32) void {
     for (self.animatedTiles.items) |*tile| {
         if (!tile.animation.update(delta)) continue;

@@ -99,8 +99,12 @@ fn parseTileLayer(ctx: *Context, layer: *const tiled.Layer) void {
         if (ctx.map.getImage(globalId)) |image| {
             const position = ctx.map.grid.indexToWorld(index);
             if (ctx.map.getAnimation(globalId)) |animation| {
-                ctx.current.addAnimatedTile(ctx.gpa, position, animation);
-            } else ctx.current.addImage(ctx.gpa, position, image);
+                ctx.current.animatedTiles.append(ctx.gpa, .{
+                    .vertex = ctx.current.vertexes.items.len,
+                    .animation = animation,
+                }) catch zhu.oom();
+                addImage(ctx, position, animation.subImage());
+            } else addImage(ctx, position, image);
         }
 
         const tile = ctx.map.getTile(globalId) orelse continue;
@@ -167,7 +171,16 @@ fn loadFlags(ctx: *Context, index: usize, flags: []const u8) void {
 fn parseImageLayer(ctx: *Context, layer: *const tiled.Layer) void {
     const image = zhu.assets.getImage(layer.image).?
         .sub(.init(.zero, .xy(layer.width, layer.height)));
-    ctx.current.addImage(ctx.gpa, layer.offset, image);
+    addImage(ctx, layer.offset, image);
+}
+
+fn addImage(ctx: *Context, position: zhu.Vector2, image: zhu.Image) void {
+    ctx.current.vertexes.append(ctx.gpa, .{
+        .position = position,
+        .layer = image.layer,
+        .size = image.size,
+        .uvRect = image.uvRect(),
+    }) catch zhu.oom();
 }
 
 fn parseObjectLayer(ctx: *Context, layer: *const tiled.Layer) void {
