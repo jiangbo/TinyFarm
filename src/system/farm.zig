@@ -265,7 +265,7 @@ test "seedPlant 会种植并扣种子" {
 
     update(&world);
 
-    const index = inv.hotbar[inv.activeHotbar].?;
+    const index = inv.hotbar[inv.activeHotbar.?].?;
     try std.testing.expectEqual(1, inv.store.get(index).?.count);
 
     const cropEntity = current.getTile(testTarget).?.get(.crop).?;
@@ -313,7 +313,7 @@ test "seedPlant 无耕地时不扣种子" {
 
     update(&world);
 
-    const index = inv.hotbar[inv.activeHotbar].?;
+    const index = inv.hotbar[inv.activeHotbar.?].?;
     try std.testing.expectEqual(2, inv.store.get(index).?.count);
     try std.testing.expectEqual(null, current.getTile(testTarget).?.get(.crop));
 }
@@ -340,7 +340,7 @@ test "seedPlant 已有作物时不扣种子" {
 
     update(&world);
 
-    const index = inv.hotbar[inv.activeHotbar].?;
+    const index = inv.hotbar[inv.activeHotbar.?].?;
     try std.testing.expectEqual(2, inv.store.get(index).?.count);
     try std.testing.expectEqual(oldCrop, current.getTile(testTarget).?.get(.crop).?);
 }

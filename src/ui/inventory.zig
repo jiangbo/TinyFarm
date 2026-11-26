@@ -25,11 +25,13 @@ pub fn update(world: *const World) void {
     const bagCaptured = bag.update(inventory);
     if (bag.drag != null) return;
 
-    if (updateUseItem(inventory, notice, bagCaptured)) return;
+    const rightClick = !drag.active() and zhu.key.pressed(.MOUSE_RIGHT);
+    if (rightClick and updateUseItem(inventory, notice, bagCaptured)) return;
 
     if (!bagCaptured) bar.update(inventory);
     const canDrag = !bagCaptured or bag.hover(inventory.activePage) != null;
     drag.update(inventory, canDrag);
+    if (rightClick and !zhu.mouse.captured) inventory.activeHotbar = null;
 }
 
 pub fn draw(world: *const World) void {
@@ -43,18 +45,17 @@ pub fn draw(world: *const World) void {
 }
 
 fn updateUseItem(inventory: *Inventory, notice: *Notice, bagCaptured: bool) bool {
-    if (drag.active() or bag.drag != null) return false;
-    if (!zhu.key.pressed(.MOUSE_RIGHT)) return false;
-
-    const index = if (bag.hover(inventory.activePage)) |bagIndex|
+    const slot: ?usize = if (bag.hover(inventory.activePage)) |bagIndex|
         bagIndex
     else if (bagCaptured)
         return false
     else if (bar.hover()) |barIndex|
-        inventory.hotbar[barIndex] orelse return false
+        inventory.hotbar[barIndex]
     else
         return false;
 
+    zhu.mouse.captured = true;
+    const index = slot orelse return true;
     switch (inventory.useAt(index)) {
         .none => {},
         .full => notice.show("背包已满", .{}),
@@ -63,7 +64,6 @@ fn updateUseItem(inventory: *Inventory, notice: *Notice, bagCaptured: bool) bool
             value.count,
         }),
     }
-    zhu.mouse.captured = true;
     return true;
 }
 

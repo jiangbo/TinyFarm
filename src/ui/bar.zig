@@ -46,7 +46,13 @@ pub fn update(inv: *Inventory) void {
         inv.activeHotbar = index;
         zhu.sound.play("audio/UI_button08.ogg");
     }
-    if (click.captured) zhu.mouse.captured = true;
+
+    const panel = zhu.Rect.init(zon.position, zon.size);
+    const mouseInPanel = panel.contains(zhu.mouse.pos);
+    const rightPressed = zhu.key.pressed(.MOUSE_RIGHT);
+    if (click.captured or (mouseInPanel and rightPressed)) {
+        zhu.mouse.captured = true;
+    }
 }
 
 pub fn hover() ?usize {

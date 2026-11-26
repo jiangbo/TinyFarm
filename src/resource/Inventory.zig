@@ -14,7 +14,7 @@ pub const Use = union(enum) { none, full, item: Stack };
 
 store: Store = .{},
 hotbar: [10]?usize = @splat(null),
-activeHotbar: usize = 0,
+activeHotbar: ?usize = 0,
 activePage: usize = 0,
 
 fn stackLimit(itemType: ItemEnum) u32 {
@@ -36,7 +36,8 @@ pub fn add(self: *Self, itemType: ItemEnum, count: u32) u32 {
 }
 
 pub fn active(self: *Self) ?ItemEnum {
-    const index = self.hotbar[self.activeHotbar] orelse return null;
+    const selected = self.activeHotbar orelse return null;
+    const index = self.hotbar[selected] orelse return null;
     const stack = self.store.getPtr(index) orelse return null;
     return stack.item;
 }
