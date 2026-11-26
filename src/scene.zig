@@ -143,12 +143,8 @@ fn enterPlay(req: title.Request) void {
     const clock = world.getResourcePtr(resource.Clock).?;
 
     zhu.camera.main.scale = .all(defaultZoom);
-
-    if (req == .load) {
-        restorePlay();
-        zhu.music.play("audio/01_spring_journey.ogg");
-        return;
-    }
+    defer zhu.music.play("audio/01_spring_journey.ogg", .{ .fadeIn = 0.2 });
+    if (req == .load) return restorePlay();
 
     // 新游戏从固定初始地图和基础工具开始。
     clock.reset();
@@ -165,7 +161,6 @@ fn enterPlay(req: title.Request) void {
     _ = inv.add(.pickaxe, 1);
     _ = inv.add(.axe, 1);
     _ = inv.add(.sickle, 1);
-    zhu.music.play("audio/01_spring_journey.ogg");
 }
 
 fn updateZoom() void {

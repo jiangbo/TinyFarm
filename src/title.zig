@@ -30,7 +30,7 @@ pub fn init() void {
 pub fn enter(world: *ecs.World) void {
     world.getResourcePtr(Settings).?.timeScale = 1;
     zhu.camera.main = .window;
-    zhu.music.play("audio/02_spring_fairy_tale.ogg");
+    zhu.music.play("audio/02_spring_fairy_tale.ogg", .{ .fadeIn = 0.2 });
     elapsed = 0;
     popup = null;
 }
