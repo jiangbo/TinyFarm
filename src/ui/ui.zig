@@ -24,11 +24,11 @@ var pauseButton: zhu.widget.Menu = titleMenus[1];
 var activePopup: ?Popup = null;
 var popupMessage: ?Message = null;
 
-pub fn init(slots: []const save.Slot) void {
+pub fn init() void {
     inventory.reset();
     notice.init();
     time.init();
-    save.init(slots);
+    save.init();
     rest.init();
     const size = pauseButton.buttons[0].shape.toRect().size;
     pauseButton.position = .xy(zhu.camera.size.x - 10 - size.x, 10);

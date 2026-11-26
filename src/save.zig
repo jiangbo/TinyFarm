@@ -66,11 +66,19 @@ pub const Record = struct {
     timeScale: f32 = 1,
 };
 
-pub var slots: [10]Slot = @splat(.empty);
+const slotsPath = "saves/slots.bin";
+
+var slots: ?[10]Slot = null;
 var states: MapRecord = .{};
 
-pub fn init() void {
-    slots = load(@TypeOf(slots), "saves/slots.bin", @splat(.empty));
+pub fn getSlots() *const [10]Slot {
+    if (slots) |*loaded| return loaded;
+    slots = zhu.storage.readValue([10]Slot, slotsPath) catch |err|
+        switch (err) {
+            error.FileNotFound => @splat(.empty),
+            else => std.debug.panic("load {s} failed: {}", .{ slotsPath, err }),
+        };
+    return &slots.?;
 }
 
 pub fn read(slot: u8) !zhu.storage.Loaded(Record) {
@@ -82,23 +90,25 @@ pub fn read(slot: u8) !zhu.storage.Loaded(Record) {
 }
 
 pub fn write(gpa: std.mem.Allocator, world: *const World, slot: u8) !void {
+    var nextSlots = getSlots().*;
     const record = capture(gpa, world);
     defer record.maps.deinit(gpa);
 
     var buffer: [32]u8 = undefined;
     const path = zhu.formatZ(&buffer, "saves/slot{d}.bin", .{slot});
 
-    try zhu.storage.writeValue(path, record);
-
-    slots[slot] = .{ .valid = .{
+    nextSlots[slot] = .{ .valid = .{
         .day = record.clock.day,
         .timestamp = record.timestamp,
     } };
-    try zhu.storage.writeValue("saves/slots.bin", slots);
+    try zhu.storage.writeValue(path, record);
+    try zhu.storage.writeValue(slotsPath, nextSlots);
+    slots = nextSlots;
     std.log.info("game saved: {s}", .{path});
 }
 
 pub fn deinit(gpa: std.mem.Allocator) void {
+    slots = null;
     states.deinit(gpa);
     states = .{};
 }
@@ -302,13 +312,6 @@ fn restoreObject(map: *MapResource, world: *World, index: usize, data: Object) v
             world.getPtr(object.entity, item.Product).?.health = saved;
         },
     }
-}
-
-fn load(T: type, path: []const u8, default: T) T {
-    return zhu.storage.readValue(T, path) catch |err| switch (err) {
-        error.FileNotFound => return default,
-        else => std.debug.panic("load {s} failed: {}", .{ path, err }),
-    };
 }
 
 test "地图状态作物会按离线天数推进" {

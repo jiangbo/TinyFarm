@@ -42,12 +42,10 @@ pub fn init(allocator_: std.mem.Allocator) void {
     world.addResource(resource.Notice{});
     world.addResource(resource.Settings.load());
 
-    // 存档状态先就位，UI 只持有这份长期有效的槽位切片。
-    save.init();
-    ui.init(&save.slots);
+    ui.init();
     title.init();
     render.init();
-    enterScene(current);
+    title.enter(&world);
 }
 
 pub fn deinit() void {
@@ -62,8 +60,6 @@ pub fn update(delta: f32) void {
     zhu.mouse.captured = false;
     applyScene();
 
-    if (updateMapFade(delta)) return;
-
     switch (current) {
         .title => if (title.update(&world, delta)) |req| {
             switch (req) {
@@ -71,9 +67,13 @@ pub fn update(delta: f32) void {
                 .load => |slot| pending = .{ .play = slot },
             }
         },
-        .play => if (ui.update(&world, delta)) |req| {
-            return updatePlayUi(req);
-        } else updatePlay(delta),
+        .play => {
+            if (updateMapFade(delta)) return;
+
+            if (ui.update(&world, delta)) |req| {
+                updatePlayUi(req);
+            } else updatePlay(delta);
+        },
     }
 }
 
@@ -162,10 +162,6 @@ fn applyScene() void {
         },
     }
     current, pending = .{ next, null };
-    enterScene(current);
-}
-
-fn enterScene(next: Scene) void {
     switch (next) {
         .title => title.enter(&world),
         .play => |slot| enterPlay(slot),

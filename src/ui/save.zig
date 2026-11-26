@@ -1,20 +1,19 @@
 const std = @import("std");
 const zhu = @import("zhu");
 
+const save = @import("../save.zig");
+
 const menus: []const zhu.widget.Menu = @import("save.zon");
 
 pub const Mode = enum { load, save };
 pub const Request = union(enum) { close, save: u8, load: u8 };
-pub const Slot = @import("../save.zig").Slot;
 
 var mode: Mode = .load;
-var records: []const Slot = &.{};
 var disabledBuffer: [menus[0].buttons.len]usize = undefined;
 var disabled: std.ArrayList(usize) = .initBuffer(&disabledBuffer);
 var menu: zhu.widget.Menu = menus[0];
 
-pub fn init(records_: []const Slot) void {
-    records = records_;
+pub fn init() void {
     menu.centerInWindow();
     popup.popupMenu.centerInWindow();
 }
@@ -25,7 +24,7 @@ pub fn open(next: Mode) void {
 
     menu.disabled = &.{};
     switch (mode) {
-        .load => load.open(),
+        .load => openLoad(),
         .save => menu.title.text = "Save Game",
     }
 }
@@ -37,11 +36,11 @@ pub fn update() ?Request {
     }
 
     if (menu.update(.{})) |event| {
-        if (event == records.len) return .close;
+        if (event == save.getSlots().len) return .close;
 
         return switch (mode) {
             .load => .{ .load = @intCast(event) },
-            .save => save.choose(event),
+            .save => chooseSave(event),
         };
     }
     return null;
@@ -49,44 +48,36 @@ pub fn update() ?Request {
 
 pub fn draw() void {
     menu.draw();
-    for (0..records.len) |index| drawSlot(index);
+    var buffer: [56]u8 = undefined;
+    for (save.getSlots(), 0..) |slot, index| {
+        const label = switch (slot) {
+            .empty => zhu.format(&buffer, "Slot {d} Empty", .{index + 1}),
+            .valid => |summary| zhu.format(&buffer, "Slot {d} Day {d}", .{
+                index + 1, summary.day,
+            }),
+        };
+        menu.drawLabel(index, label);
+    }
     popup.draw();
 }
 
-fn drawSlot(index: usize) void {
-    var buffer: [56]u8 = undefined;
-    const label = switch (records[index]) {
-        .empty => zhu.format(&buffer, "Slot {d} Empty", .{index + 1}),
-        .valid => |summary| zhu.format(&buffer, "Slot {d} Day {d}", .{
-            index + 1,
-            summary.day,
-        }),
+fn openLoad() void {
+    disabled.clearRetainingCapacity();
+    for (save.getSlots(), 0..) |slot, index| switch (slot) {
+        .valid => {},
+        .empty => disabled.appendAssumeCapacity(index),
     };
-
-    menu.drawLabel(index, label);
+    menu.disabled = disabled.items;
+    menu.title.text = "Load Game";
 }
 
-const load = struct {
-    fn open() void {
-        disabled.clearRetainingCapacity();
-        for (0..records.len) |index| switch (records[index]) {
-            .valid => {},
-            .empty => disabled.appendAssumeCapacity(index),
-        };
-        menu.disabled = disabled.items;
-        menu.title.text = "Load Game";
+fn chooseSave(slot: usize) ?Request {
+    switch (save.getSlots()[slot]) {
+        .empty => return .{ .save = @intCast(slot) },
+        .valid => popup.slot = @intCast(slot),
     }
-};
-
-const save = struct {
-    fn choose(slot: usize) ?Request {
-        switch (records[slot]) {
-            .empty => return .{ .save = @intCast(slot) },
-            .valid => popup.slot = @intCast(slot),
-        }
-        return null;
-    }
-};
+    return null;
+}
 
 const popup = struct {
     var slot: ?u8 = null;
