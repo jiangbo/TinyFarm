@@ -2,6 +2,7 @@ const std = @import("std");
 const zhu = @import("zhu");
 const ecs = @import("ecs");
 
+const component = @import("../component.zig");
 const inventory = @import("inventory.zig");
 const notice = @import("notice.zig");
 const rest = @import("rest.zig");
@@ -33,7 +34,7 @@ pub fn resetInventory() void {
     inventory.reset();
 }
 
-pub fn open(next: enum { pause, rest }) void {
+fn open(next: enum { pause, rest }) void {
     switch (next) {
         .pause => {
             pause.open(.play);
@@ -51,6 +52,13 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
 
     if (activePopup) |active| {
         if (updatePopup(world, active)) |req| return req;
+        return .block;
+    }
+
+    const Interact = component.actor.Interact;
+    if (world.getByIdentity(Interact, component.map.Rest) != null) {
+        world.removeIdentity(Interact);
+        open(.rest);
         return .block;
     }
 

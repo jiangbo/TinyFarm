@@ -21,7 +21,6 @@ const resource = struct {
 
 const World = ecs.World;
 const actor = component.actor;
-const Rest = component.map.Rest;
 const Transition = component.map.Transition;
 const Trigger = component.map.Trigger;
 
@@ -72,11 +71,11 @@ pub fn update(delta: f32) void {
         },
         .play => {
             if (updateMapFade(delta)) return;
-            if (ui.update(&world, delta)) |req| updatePlayUi(req) else {
-                system.update(&world, delta);
-                if (world.getByIdentity(actor.Interact, Rest) != null)
-                    ui.open(.rest);
-            }
+            if (ui.update(&world, delta)) |req| switch (req) {
+                .block => {},
+                .title => pending = .title,
+                .load => restorePlay(),
+            } else system.update(&world, delta);
         },
     }
 }
@@ -95,14 +94,6 @@ pub fn draw() void {
             ui.draw(&world);
             mapFade.draw(.init(.zero, zhu.camera.size), .black);
         },
-    }
-}
-
-fn updatePlayUi(req: ui.Request) void {
-    switch (req) {
-        .block => {},
-        .title => pending = .title,
-        .load => restorePlay(),
     }
 }
 
