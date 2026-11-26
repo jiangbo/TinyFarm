@@ -51,8 +51,7 @@ pub const Item = struct {
     limit: u32 = 99,
     icon: Sprite,
     product: ?item.Stack = null,
-    health: ?u8 = null,
-    hit: ?item.Hit = null,
+    hit: ?item.Product = null,
 };
 
 pub const CropStage = struct { sprite: Sprite, duration: f32 };
@@ -303,13 +302,8 @@ fn addMapItemProduct(
     const animation = tile.getProperty("anim_id", []const u8) orelse return;
     const tool = std.meta.stringToEnum(item.ItemEnum, animation) orelse return;
     const hit = itemConfig(tool).hit orelse return;
-    const cfg = itemConfig(hit.target);
-
-    // 产出和生命值来自 ZON，anim_id 只负责选中工具配置。
-    world.add(entity, item.Product{
-        .drop = cfg.product.?,
-        .health = cfg.health.?,
-    });
+    // 工具命中配置提供掉落和生命值，anim_id 只负责选中工具。
+    world.add(entity, hit);
 }
 
 fn chestItems(object: Object) item.Counts {
@@ -695,12 +689,4 @@ test "带 anim_id 的地图摆件会创建停止的非循环动画" {
     try std.testing.expect(animation.isFinished());
     try expectEqual(0, sprite.image.offset.x);
     try expectEqual(0, sprite.image.offset.y);
-}
-
-test "工具命中目标和资源耐久来自物品配置" {
-    try expectEqual(item.ItemEnum.stone, itemConfig(.pickaxe).hit.?.target);
-    try expectEqual(item.ItemEnum.timber, itemConfig(.axe).hit.?.target);
-
-    try expectEqual(3, itemConfig(.stone).health.?);
-    try expectEqual(5, itemConfig(.timber).health.?);
 }

@@ -131,7 +131,7 @@ fn hitProduct(world: *World, current: *Map, want: WantUse) void {
     const index = current.grid.worldToIndex(want.target) orelse return;
     const entity = current.tiles[index].get(.product) orelse return;
     const product = world.getPtr(entity, Product).?;
-    if (product.drop.item != hit.target) return;
+    if (product.drop.item != hit.drop.item) return;
 
     std.debug.assert(product.health > 0);
     product.health -= 1;

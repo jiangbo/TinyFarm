@@ -178,7 +178,6 @@ pub const item = struct {
 
     pub const Stack = zhu.extend.bag.StackT(ItemEnum);
     pub const Product = struct { drop: Stack, health: u8 };
-    pub const Hit = struct { target: ItemEnum };
 
     pub const Pickup = struct { item: ItemEnum, count: u32 = 1 };
 
