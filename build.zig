@@ -99,6 +99,7 @@ pub fn build(b: *std.Build) !void {
         .input = "raw-assets",
         .include = &.{
             "circle.png",
+            "gradient.png",
             "light.png",
             "spot.png",
             "textures/",

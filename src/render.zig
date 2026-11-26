@@ -37,6 +37,7 @@ const clearColor: zhu.Color = .rgb(59, 79, 69);
 var canvas: zhu.graphics.RenderTarget = .{};
 var lightCanvas: zhu.graphics.RenderTarget = .{};
 var bubbleImage: zhu.NineImage = undefined;
+var gradientImage: zhu.Image = undefined;
 var glowImage: zhu.Image = undefined;
 var spotImage: zhu.Image = undefined;
 var mapImage: zhu.Image = undefined;
@@ -54,6 +55,7 @@ pub fn init() void {
         .rect = .init(.xy(0, 48), .xy(48, 48)),
         .patch = .{ .min = .xy(3, 4), .max = .xy(3, 3) },
     });
+    gradientImage = zhu.getImage("gradient.png").?.withFilter(.linear);
     glowImage = zhu.getImage("light.png").?.withFilter(.linear);
     spotImage = zhu.getImage("spot.png").?.withFilter(.linear);
     mapImage = zhu.getImage("circle.png").?;
@@ -72,8 +74,22 @@ pub fn deinit() void {
 pub fn draw(world: *const World) void {
     const clock = world.getResourcePtr(Clock).?;
     const current = world.getResourcePtr(Map).?;
-    const ambient = ambientColor(current, clock);
-    zhu.batch.beginDraw(ambient, .{ .target = &lightCanvas });
+    const hour = @as(f32, @floatFromInt(clock.hour)) + clock.minute / 60;
+    const outdoor = current.props.outdoor;
+    const ambient = if (outdoor) ambientAt(hour) else current.props.indoorAmbient;
+    const morning = hour < 12;
+    const peak: f32 = if (morning) 6 else 18;
+    const sun = if (outdoor) 0.3 * smoothStep(1 - @abs(hour - peak) / 2) else 0;
+
+    // 将部分环境光移到渐变上，亮侧仍接近原来的亮度。
+    zhu.batch.beginDraw(ambient.mix(.black, sun), .{ .target = &lightCanvas });
+    if (sun > 0) zhu.batch.drawCamera(gradientImage, .zero, .window, .{
+        .size = lightCanvas.image.size,
+        .uvRect = gradientImage.uvFlip(!morning, false),
+        .color = .all(0),
+        .addColor = ambient.scaleAlpha(sun),
+    });
+
     drawLights(world);
 
     zhu.batch.useTarget(clearColor, .{ .target = &canvas });
@@ -190,12 +206,6 @@ fn drawEmissive(world: *const World) void {
         const glowSize = @max(em.size.x, em.size.y) + 22;
         drawGlow(center, glowSize, em.color.scaleAlpha(alpha * 0.35));
     }
-}
-
-fn ambientColor(current: *const Map, clock: *const Clock) zhu.Color {
-    if (!current.props.outdoor) return current.props.indoorAmbient;
-    const hour = @as(f32, @floatFromInt(clock.hour)) + clock.minute / 60;
-    return ambientAt(hour);
 }
 
 fn ambientAt(hour: f32) zhu.Color {

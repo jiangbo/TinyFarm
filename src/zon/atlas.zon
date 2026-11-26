@@ -1,7 +1,7 @@
 .{
     .imagePaths = .{
         "atlas/aec74afdf7512057.png",
-        "atlas/14514f44f319359d.png",
+        "atlas/9557f8f7d6a8c295.png",
         "atlas/e005aeafd409c8a9.png",
         "font/f294019a0d99631e.png",
     },
@@ -78,6 +78,12 @@
             .layer = 1,
             .offset = .{ .x = 387, .y = 259 },
             .size = .{ .x = 586, .y = 250 },
+        },
+        .{
+            .view = .{ .id = 1354332736 },
+            .layer = 1,
+            .offset = .{ .x = 1, .y = 1013 },
+            .size = .{ .x = 256, .y = 8 },
         },
         .{
             .view = .{ .id = 1355702369 },
