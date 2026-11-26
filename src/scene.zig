@@ -72,10 +72,11 @@ pub fn update(delta: f32) void {
         },
         .play => {
             if (updateMapFade(delta)) return;
-
-            if (ui.update(&world, delta)) |req| {
-                updatePlayUi(req);
-            } else updatePlay(delta);
+            if (ui.update(&world, delta)) |req| updatePlayUi(req) else {
+                system.update(&world, delta);
+                if (world.getByIdentity(actor.Interact, Rest) != null)
+                    ui.open(.rest);
+            }
         },
     }
 }
@@ -103,17 +104,6 @@ fn updatePlayUi(req: ui.Request) void {
         .title => pending = .title,
         .load => restorePlay(),
     }
-}
-
-fn updatePlay(delta: f32) void {
-    const clock = world.getResourcePtr(resource.Clock).?;
-
-    // 农场主循环顺序在这里显式编排，新增系统需要在这里确定位置。
-    if (pending != null) return;
-    if (clock.paused) return;
-
-    system.update(&world, delta);
-    if (world.getByIdentity(actor.Interact, Rest) != null) ui.open(.rest);
 }
 
 fn updateMapFade(delta: f32) bool {
