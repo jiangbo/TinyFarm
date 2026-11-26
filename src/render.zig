@@ -54,8 +54,8 @@ pub fn init() void {
         .rect = .init(.xy(0, 48), .xy(48, 48)),
         .patch = .{ .min = .xy(3, 4), .max = .xy(3, 3) },
     });
-    glowImage = zhu.getImage("light.png").?;
-    spotImage = zhu.getImage("spot.png").?;
+    glowImage = zhu.getImage("light.png").?.withFilter(.linear);
+    spotImage = zhu.getImage("spot.png").?.withFilter(.linear);
     mapImage = zhu.getImage("circle.png").?;
     const land = zhu.getImage(
         "farm-rpg/Farm/Tileset/Modular/Tilled Soil and wet soil.png",
@@ -174,12 +174,14 @@ fn drawLights(world: *const World) void {
 }
 
 fn drawEmissive(world: *const World) void {
+    // 白块内部颜色一致，使用线性采样以便与光晕合批。
+    const white = zhu.batch.whiteImage.withFilter(.linear);
     var query = world.query(.{ Position, Emissive, Enabled });
     while (query.next()) |row| {
         const pos = row.get(Position);
         const em = row.get(Emissive);
         const alpha = std.math.clamp(em.intensity, 0, 1);
-        zhu.batch.drawImage(zhu.batch.whiteImage, pos, .{
+        zhu.batch.drawImage(white, pos, .{
             .size = em.size,
             .color = .all(0),
             .addColor = em.color.scaleAlpha(alpha),

@@ -12,11 +12,7 @@ timeScale: f32 = 1,
 lightOn: bool = false,
 
 pub fn load() Settings {
-    const global = zhu.storage.readValue(Global, "settings.bin") catch |err|
-        switch (err) {
-            error.FileNotFound => Global{},
-            else => std.debug.panic("load settings.bin failed: {}", .{err}),
-        };
+    const global = zhu.storage.readValue(Global, "settings.bin") catch Global{};
     zhu.music.setVolume(global.music);
     zhu.sound.setVolume(global.sound);
     return .{ .music = global.music, .sound = global.sound };

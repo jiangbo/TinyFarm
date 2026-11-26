@@ -238,3 +238,15 @@ C++ TinyFarm 的 `src/game/` 是游戏实现，`src/engine/` 是引擎实现。
 zig build -fincremental --fork /root/github/ZhuYu
 zig build test -fincremental --fork /root/github/ZhuYu
 ```
+
+### 从本地更新 ZhuYu 依赖
+
+当 Zig 通过 GitHub 取包失败时，在 TinyFarm 根目录执行以下命令。
+
+```sh
+zig fetch ../ZhuYu
+```
+
+`zig fetch` 将本地源码写入已配置的包目录并输出包哈希。省略 `--save`，然后手动编辑
+`build.zig.zon` 的 `.dependencies.zhuyu`。保留 `.url` 的 `git+https` 地址，把 `#`
+后的提交号更新为本次取包对应的提交，再把 `.hash` 换成 `zig fetch` 输出的哈希。

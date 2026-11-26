@@ -74,10 +74,7 @@ var states: MapRecord = .{};
 
 pub fn getSlots() *const [10]Slot {
     if (slots) |*loaded| return loaded;
-    slots = zhu.storage.readValue([10]Slot, slotsPath) catch |err| switch (err) {
-        error.FileNotFound => @splat(.empty),
-        else => std.debug.panic("load {s} failed: {}", .{ slotsPath, err }),
-    };
+    slots = zhu.storage.readValue([10]Slot, slotsPath) catch @splat(.empty);
     return &slots.?;
 }
 
