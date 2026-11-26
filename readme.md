@@ -93,6 +93,7 @@ zig build -Dtarget=wasm32-emscripten
 | I | 物品栏 |
 | Tab | 切换快捷栏 |
 | 1–9、0 | 选择快捷栏槽位 |
+| 鼠标滚轮 / 中键 | 缩放世界视野 / 恢复 2× |
 | P / Esc | 暂停 |
 | X | 切换调试信息 |
 

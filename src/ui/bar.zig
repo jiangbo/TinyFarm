@@ -48,9 +48,7 @@ pub fn update(inv: *Inventory) void {
     }
 
     const panel = zhu.Rect.init(zon.position, zon.size);
-    const mouseInPanel = panel.contains(zhu.mouse.pos);
-    const rightPressed = zhu.key.pressed(.MOUSE_RIGHT);
-    if (click.captured or (mouseInPanel and rightPressed)) {
+    if (click.captured or panel.contains(zhu.mouse.pos)) {
         zhu.mouse.captured = true;
     }
 }

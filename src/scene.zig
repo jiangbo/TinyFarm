@@ -23,6 +23,7 @@ const World = ecs.World;
 const actor = component.actor;
 const Transition = component.map.Transition;
 const Trigger = component.map.Trigger;
+const defaultZoom: f32 = 2;
 
 const Scene = enum { title, play };
 const Spawn = union(enum) {
@@ -75,7 +76,10 @@ pub fn update(delta: f32) void {
                 .block => {},
                 .title => pending = .title,
                 .load => restorePlay(),
-            } else system.update(&world, delta);
+            } else {
+                updateZoom();
+                system.update(&world, delta);
+            }
         },
     }
 }
@@ -138,7 +142,7 @@ fn applyScene() void {
 fn enterPlay(req: title.Request) void {
     const clock = world.getResourcePtr(resource.Clock).?;
 
-    zhu.camera.main.scale = .all(2);
+    zhu.camera.main.scale = .all(defaultZoom);
 
     if (req == .load) {
         restorePlay();
@@ -162,6 +166,23 @@ fn enterPlay(req: title.Request) void {
     _ = inv.add(.axe, 1);
     _ = inv.add(.sickle, 1);
     zhu.music.play("audio/01_spring_journey.ogg");
+}
+
+fn updateZoom() void {
+    const scroll = zhu.mouse.scrollY;
+    const reset = zhu.key.pressed(.MOUSE_MIDDLE);
+    if (scroll == 0 and !reset) return;
+
+    const currentZoom = zhu.camera.main.scale.x;
+    const wheelZoom = currentZoom + scroll * 0.15;
+    const zoom = if (reset) defaultZoom else std.math.clamp(wheelZoom, 1.6, 3);
+    if (zoom == currentZoom) return;
+
+    const halfView = zhu.camera.size.scale(0.5);
+    const center = zhu.camera.toWorld(halfView);
+    zhu.camera.main.scale = .all(zoom);
+    zhu.camera.main.position = center.sub(halfView.div(zhu.camera.main.scale));
+    zhu.camera.clampBound();
 }
 
 fn restorePlay() void {
