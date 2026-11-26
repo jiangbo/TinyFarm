@@ -25,13 +25,13 @@ const Rest = component.map.Rest;
 const Transition = component.map.Transition;
 const Trigger = component.map.Trigger;
 
-const Scene = union(enum) { title, play: ?u8 };
+const Scene = enum { title, play };
 
 pub var world: World = undefined;
 var allocator: std.mem.Allocator = undefined;
 var mapFade: zhu.widget.Fade = .init(0.15);
 var current: Scene = .title;
-var pending: ?Scene = null;
+var pending: ?union(Scene) { title, play: title.Request } = null;
 
 pub fn init(allocator_: std.mem.Allocator) void {
     allocator = allocator_;
@@ -49,6 +49,7 @@ pub fn init(allocator_: std.mem.Allocator) void {
 }
 
 pub fn deinit() void {
+    pending = null;
     render.deinit();
     unloadMap();
     save.deinit(allocator);
@@ -62,10 +63,7 @@ pub fn update(delta: f32) void {
 
     switch (current) {
         .title => if (title.update(&world, delta)) |req| {
-            switch (req) {
-                .start => pending = .{ .play = null },
-                .load => |slot| pending = .{ .play = slot },
-            }
+            pending = .{ .play = req };
         },
         .play => {
             if (updateMapFade(delta)) return;
@@ -98,20 +96,7 @@ fn updatePlayUi(req: ui.Request) void {
     switch (req) {
         .block => {},
         .title => pending = .title,
-        .save => |slot| {
-            if (!saveSlot(slot)) {
-                ui.showMessage(.{ .text = "保存失败", .fail = true });
-                return;
-            }
-            ui.showMessage(.{ .text = "保存成功", .fail = false });
-        },
-        .load => |slot| {
-            if (!load(slot)) {
-                ui.showMessage(.{ .text = "读取失败", .fail = true });
-                return;
-            }
-            ui.close();
-        },
+        .load => restorePlay(),
     }
 }
 
@@ -153,6 +138,8 @@ fn updateMapFade(delta: f32) bool {
 
 fn applyScene() void {
     const next = pending orelse return;
+    pending = null;
+
     ui.close();
     switch (current) {
         .title => title.exit(),
@@ -161,24 +148,20 @@ fn applyScene() void {
             exitMap();
         },
     }
-    current, pending = .{ next, null };
+    current = next;
     switch (next) {
         .title => title.enter(&world),
-        .play => |slot| enterPlay(slot),
+        .play => |req| enterPlay(req),
     }
 }
 
-fn enterPlay(loadSlot: ?u8) void {
+fn enterPlay(req: title.Request) void {
     const clock = world.getResourcePtr(resource.Clock).?;
 
     zhu.camera.main.scale = .all(2);
 
-    if (loadSlot) |slot| {
-        if (!load(slot)) {
-            current = .title;
-            title.enter(&world);
-            return;
-        }
+    if (req == .load) {
+        restorePlay();
         zhu.music.play("audio/01_spring_journey.ogg");
         return;
     }
@@ -206,24 +189,9 @@ fn enterPlay(loadSlot: ?u8) void {
     zhu.music.play("audio/01_spring_journey.ogg");
 }
 
-fn saveSlot(slot: u8) bool {
-    save.write(allocator, &world, slot) catch |err| {
-        std.log.err("save slot {} failed: {}", .{ slot, err });
-        return false;
-    };
-    return true;
-}
-
-fn load(slot: u8) bool {
-    var record = save.read(slot) catch |err| {
-        std.log.err("load slot {} failed: {}", .{ slot, err });
-        return false;
-    };
-    defer record.deinit();
-
-    const player = record.value.player;
+fn restorePlay() void {
+    const player = save.restoreCached(allocator, &world);
     unloadMap();
-    save.restore(allocator, &world, record.value);
     world.getResourcePtr(resource.Notice).?.reset();
     world.getResourcePtr(resource.Settings).?.lightOn = false;
 
@@ -233,7 +201,7 @@ fn load(slot: u8) bool {
     system.light.update(&world);
     system.sort.update(&world);
     ui.resetInventory();
-    return true;
+    ui.close();
 }
 
 fn enterMap(id: component.map.Id) void {

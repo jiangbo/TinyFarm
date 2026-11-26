@@ -1,12 +1,13 @@
 const std = @import("std");
 const zhu = @import("zhu");
+const ecs = @import("ecs");
 
 const save = @import("../save.zig");
 
 const menus: []const zhu.widget.Menu = @import("save.zon");
 
 pub const Mode = enum { load, save };
-pub const Request = union(enum) { close, save: u8, load: u8 };
+pub const Request = enum { close, load };
 
 var mode: Mode = .load;
 var disabledBuffer: [menus[0].buttons.len]usize = undefined;
@@ -29,19 +30,23 @@ pub fn open(next: Mode) void {
     }
 }
 
-pub fn update() ?Request {
+pub fn update(world: *const ecs.World) ?Request {
     if (popup.slot != null) {
-        if (popup.update()) |slot| return .{ .save = slot };
+        if (popup.update()) |slot| write(world, slot);
         return null;
     }
 
     if (menu.update(.{})) |event| {
         if (event == save.getSlots().len) return .close;
 
-        return switch (mode) {
-            .load => .{ .load = @intCast(event) },
-            .save => chooseSave(event),
-        };
+        switch (mode) {
+            .load => {
+                if (save.readToCache(@intCast(event))) return .load;
+                menu.title.text = "读取失败";
+                return null;
+            },
+            .save => chooseSave(world, @intCast(event)),
+        }
     }
     return null;
 }
@@ -71,12 +76,15 @@ fn openLoad() void {
     menu.title.text = "Load Game";
 }
 
-fn chooseSave(slot: usize) ?Request {
+fn chooseSave(world: *const ecs.World, slot: u8) void {
     switch (save.getSlots()[slot]) {
-        .empty => return .{ .save = @intCast(slot) },
-        .valid => popup.slot = @intCast(slot),
+        .empty => write(world, slot),
+        .valid => popup.slot = slot,
     }
-    return null;
+}
+
+fn write(world: *const ecs.World, slot: u8) void {
+    menu.title.text = if (save.write(world, slot)) "保存成功" else "保存失败";
 }
 
 const popup = struct {

@@ -8,9 +8,9 @@ const Settings = @import("resource/Settings.zig");
 
 const menus: []const zhu.widget.Menu = @import("zon/title.zon");
 
-pub const Request = union(enum) { start, load: u8 };
+pub const Request = enum { start, load };
 const Button = enum(u8) { start, load, exit };
-const Popup = enum { pause, save };
+const Popup = enum { pause, load };
 
 var mainMenu: zhu.widget.Menu = menus[0];
 var pauseButton: zhu.widget.Menu = menus[1];
@@ -56,7 +56,7 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
             .start => return .start,
             .load => {
                 save.open(.load);
-                popup = .save;
+                popup = .load;
             },
             .exit => zhu.window.exit(),
         }
@@ -73,11 +73,10 @@ fn updatePopup(world: *ecs.World, active: Popup) ?Request {
                 .title => unreachable,
             };
         },
-        .save => {
-            if (save.update()) |req| switch (req) {
+        .load => {
+            if (save.update(world)) |req| switch (req) {
                 .close => popup = null,
-                .load => |slot| return .{ .load = slot },
-                .save => unreachable,
+                .load => return .load,
             };
         },
     }
@@ -98,6 +97,6 @@ pub fn draw(world: *const ecs.World) void {
     pauseButton.draw();
     switch (popup orelse return) {
         .pause => pause.draw(world),
-        .save => save.draw(),
+        .load => save.draw(),
     }
 }

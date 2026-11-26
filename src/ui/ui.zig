@@ -11,18 +11,11 @@ const save = @import("save.zig");
 
 const titleMenus: []const zhu.widget.Menu = @import("../zon/title.zon");
 
-pub const Message = struct { text: []const u8, fail: bool };
-pub const Request = union(enum) {
-    block,
-    title,
-    save: u8,
-    load: u8,
-};
+pub const Request = enum { block, title, load };
 const Popup = enum { save, rest, pause };
 
 var pauseButton: zhu.widget.Menu = titleMenus[1];
 var activePopup: ?Popup = null;
-var popupMessage: ?Message = null;
 
 pub fn init() void {
     inventory.reset();
@@ -78,31 +71,18 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
 
 fn updatePopup(world: *ecs.World, active: Popup) ?Request {
     switch (active) {
-        .save => {
-            if (save.update()) |result| {
-                switch (result) {
-                    .close => close(),
-                    .save => |slot| {
-                        activePopup = .pause;
-                        return .{ .save = slot };
-                    },
-                    .load => |slot| {
-                        activePopup = .pause;
-                        return .{ .load = slot };
-                    },
-                }
-            }
+        .save => if (save.update(world)) |result| switch (result) {
+            .close => close(),
+            .load => return .load,
         },
         .rest => if (rest.update(world)) close(),
         .pause => if (pause.update(world)) |req| switch (req) {
             .close => close(),
             .save => {
-                popupMessage = null;
                 save.open(.save);
                 activePopup = .save;
             },
             .load => {
-                popupMessage = null;
                 save.open(.load);
                 activePopup = .save;
             },
@@ -112,13 +92,8 @@ fn updatePopup(world: *ecs.World, active: Popup) ?Request {
     return null;
 }
 
-pub fn showMessage(next: Message) void {
-    popupMessage = next;
-}
-
 pub fn close() void {
     activePopup = null;
-    popupMessage = null;
 }
 
 pub fn draw(world: *const ecs.World) void {
@@ -132,15 +107,6 @@ pub fn draw(world: *const ecs.World) void {
             .rest => rest.draw(),
             .pause => pause.draw(world),
         }
-    }
-
-    if (popupMessage) |current| {
-        var color = zhu.Color.rgb(64, 255, 64);
-        if (current.fail) color = .rgb(255, 64, 64);
-        zhu.text.draw(current.text, .xy(zhu.camera.size.x * 0.5, 32), .{
-            .anchor = .center,
-            .color = color,
-        });
     }
 
     notice.draw(world);

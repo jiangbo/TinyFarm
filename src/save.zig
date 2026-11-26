@@ -57,7 +57,7 @@ pub const MapRecord = struct {
     }
 };
 
-pub const Record = struct {
+const Record = struct {
     timestamp: i64 = 0,
     clock: Clock = .{},
     player: Player = .{},
@@ -69,27 +69,32 @@ pub const Record = struct {
 const slotsPath = "saves/slots.bin";
 
 var slots: ?[10]Slot = null;
+var cached: ?zhu.storage.Loaded(Record) = null;
 var states: MapRecord = .{};
 
 pub fn getSlots() *const [10]Slot {
     if (slots) |*loaded| return loaded;
-    slots = zhu.storage.readValue([10]Slot, slotsPath) catch |err|
-        switch (err) {
-            error.FileNotFound => @splat(.empty),
-            else => std.debug.panic("load {s} failed: {}", .{ slotsPath, err }),
-        };
+    slots = zhu.storage.readValue([10]Slot, slotsPath) catch |err| switch (err) {
+        error.FileNotFound => @splat(.empty),
+        else => std.debug.panic("load {s} failed: {}", .{ slotsPath, err }),
+    };
     return &slots.?;
 }
 
-pub fn read(slot: u8) !zhu.storage.Loaded(Record) {
+pub fn readToCache(slot: u8) bool {
+    std.debug.assert(cached == null);
     var buffer: [32]u8 = undefined;
     const path = zhu.formatZ(&buffer, "saves/slot{d}.bin", .{slot});
-    const record = try zhu.storage.readArena(Record, path);
+    cached = zhu.storage.readArena(Record, path) catch |err| {
+        std.log.err("load slot {} failed: {}", .{ slot, err });
+        return false;
+    };
     std.log.info("game loaded: {s}", .{path});
-    return record;
+    return true;
 }
 
-pub fn write(gpa: std.mem.Allocator, world: *const World, slot: u8) !void {
+pub fn write(world: *const World, slot: u8) bool {
+    const gpa = world.allocator;
     var nextSlots = getSlots().*;
     const record = capture(gpa, world);
     defer record.maps.deinit(gpa);
@@ -101,13 +106,22 @@ pub fn write(gpa: std.mem.Allocator, world: *const World, slot: u8) !void {
         .day = record.clock.day,
         .timestamp = record.timestamp,
     } };
-    try zhu.storage.writeValue(path, record);
-    try zhu.storage.writeValue(slotsPath, nextSlots);
+    zhu.storage.writeValue(path, record) catch |err| {
+        std.log.err("write {s} failed: {}", .{ path, err });
+        return false;
+    };
+    zhu.storage.writeValue(slotsPath, nextSlots) catch |err| {
+        std.log.err("write {s} failed: {}", .{ slotsPath, err });
+        return false;
+    };
     slots = nextSlots;
     std.log.info("game saved: {s}", .{path});
+    return true;
 }
 
 pub fn deinit(gpa: std.mem.Allocator) void {
+    if (cached) |*record| record.deinit();
+    cached = null;
     slots = null;
     states.deinit(gpa);
     states = .{};
@@ -131,11 +145,17 @@ fn capture(gpa: std.mem.Allocator, world: *const World) Record {
     };
 }
 
-pub fn restore(gpa: std.mem.Allocator, world: *World, record: Record) void {
+pub fn restoreCached(gpa: std.mem.Allocator, world: *World) Player {
+    var loaded = cached.?;
+    cached = null;
+    defer loaded.deinit();
+
+    const record = &loaded.value;
     world.getResourcePtr(Clock).?.* = record.clock;
     world.getResourcePtr(Settings).?.timeScale = record.timeScale;
     restoreMaps(gpa, record.maps, record.clock.day);
     world.getResourcePtr(Inventory).?.* = record.inventory;
+    return record.player;
 }
 
 pub fn resetMaps() void {
