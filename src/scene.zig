@@ -26,6 +26,11 @@ const Transition = component.map.Transition;
 const Trigger = component.map.Trigger;
 
 const Scene = enum { title, play };
+const Spawn = union(enum) {
+    start: component.map.Id,
+    saved: save.Player,
+    trigger: Transition,
+};
 
 pub var world: World = undefined;
 var allocator: std.mem.Allocator = undefined;
@@ -124,11 +129,9 @@ fn updateMapFade(delta: f32) bool {
         .covered => {
             const playerEntity = world.getIdentity(actor.Player).?;
             const request = world.get(playerEntity, Transition).?;
-            exitMap();
-            enterMap(request.target);
-            spawnPlayer(triggerPosition(request.targetId), .down);
-            system.light.update(&world);
-            system.sort.update(&world);
+            save.captureMap(allocator, &world);
+            unloadMap();
+            enterMap(.{ .trigger = request });
             mapFade.fadeIn();
         },
         .clear => {},
@@ -145,7 +148,7 @@ fn applyScene() void {
         .title => title.exit(),
         .play => {
             mapFade = .init(0.15);
-            exitMap();
+            unloadMap();
         },
     }
     current = next;
@@ -172,12 +175,7 @@ fn enterPlay(req: title.Request) void {
     world.getResourcePtr(resource.Settings).?.lightOn = false;
     save.resetMaps();
 
-    world.resetKeepResources();
-    enterMap(.home_exterior);
-    const loaded = world.getResourcePtr(resource.Map).?;
-    spawnPlayer(loaded.props.playerSpawn.?, .down);
-    system.light.update(&world);
-    system.sort.update(&world);
+    enterMap(.{ .start = .home_exterior });
     const inv = world.getResourcePtr(resource.Inventory).?;
     inv.reset();
     ui.resetInventory();
@@ -195,37 +193,39 @@ fn restorePlay() void {
     world.getResourcePtr(resource.Notice).?.reset();
     world.getResourcePtr(resource.Settings).?.lightOn = false;
 
-    world.resetKeepResources();
-    enterMap(player.map);
-    spawnPlayer(player.position, player.facing);
-    system.light.update(&world);
-    system.sort.update(&world);
+    enterMap(.{ .saved = player });
     ui.resetInventory();
     ui.close();
 }
 
-fn enterMap(id: component.map.Id) void {
+fn enterMap(spawn: Spawn) void {
+    const id = switch (spawn) {
+        .start => |id| id,
+        .saved => |player| player.map,
+        .trigger => |request| request.target,
+    };
     var loaded = loader.load(allocator, &world, id);
     save.applyMap(allocator, &world, &loaded);
     world.addResource(loaded);
     zhu.camera.bound = loaded.grid.size();
-}
 
-fn exitMap() void {
-    save.captureMap(allocator, &world);
-    unloadMap();
-    world.resetKeepResources();
+    const position = switch (spawn) {
+        .start => loaded.props.playerSpawn.?,
+        .saved => |player| player.position,
+        .trigger => |request| triggerPosition(request.targetId),
+    };
+    const facing = if (spawn == .saved) spawn.saved.facing else .down;
+    factory.spawnPlayer(&world, position, facing);
+    zhu.camera.directFollow(position);
+    system.light.update(&world);
+    system.sort.update(&world);
 }
 
 fn unloadMap() void {
     const loaded = world.getResourcePtr(resource.Map) orelse return;
     loaded.deinit(allocator);
     world.removeResource(resource.Map);
-}
-
-fn spawnPlayer(position: zhu.Vector2, facing: actor.Facing) void {
-    factory.spawnPlayer(&world, position, facing);
-    zhu.camera.directFollow(position);
+    world.resetKeepResources();
 }
 
 fn triggerPosition(targetId: i32) zhu.Vector2 {
