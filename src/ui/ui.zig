@@ -55,9 +55,8 @@ pub fn update(world: *ecs.World, delta: f32) ?Request {
         return .block;
     }
 
-    const Interact = component.actor.Interact;
-    if (world.getByIdentity(Interact, component.map.Rest) != null) {
-        world.removeIdentity(Interact);
+    if (world.has(component.actor.Interact, component.map.Rest)) {
+        world.removeIdentity(component.actor.Interact);
         open(.rest);
         return .block;
     }

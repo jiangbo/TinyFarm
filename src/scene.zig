@@ -99,13 +99,13 @@ pub fn draw() void {
 
 fn updateMapFade(delta: f32) bool {
     if (!mapFade.active()) {
-        if (world.getByIdentity(actor.Player, Transition) == null) return false;
+        if (!world.has(actor.Player, Transition)) return false;
         mapFade.fadeOut();
     }
 
     if (mapFade.update(delta)) |event| switch (event) {
         .covered => {
-            const request = world.getByIdentity(actor.Player, Transition).?;
+            const request = world.get(actor.Player, Transition).?;
             save.captureMap(allocator, &world);
             unloadMap();
             enterMap(.{ .trigger = request });
