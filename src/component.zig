@@ -38,14 +38,13 @@ pub const render = struct {
 pub const map = struct {
     // 枚举名与 Tiled 地图的 target_map 配置一致。
     pub const Id = enum { school, town, home_exterior, home_interior };
-    pub const StartOffset = enum { none, left, right, top, bottom };
 
     pub const Trigger = struct {
         rect: zhu.Rect,
         selfId: i32,
         targetId: i32,
         targetMap: Id,
-        startOffset: StartOffset,
+        spawn: zhu.Vector2,
     };
 
     pub const Transition = struct { target: Id, targetId: i32 };

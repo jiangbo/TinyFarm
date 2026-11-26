@@ -16,6 +16,7 @@ const motion = component.motion;
 const Id = component.map.Id;
 const Trigger = component.map.Trigger;
 const SolidRange = component.map.SolidRange;
+const StartOffset = enum { none, left, right, top, bottom };
 
 const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
     @import("zon/maps/school.zon"),
@@ -67,20 +68,8 @@ pub fn load(gpa: std.mem.Allocator, world: *World, id: Id) Map {
 
     // 原始地图没有住宅室外与城镇的连接，由游戏补充。
     const trigger: ?Trigger = switch (id) {
-        .home_exterior => .{
-            .rect = .init(.xy(552, 227), .xy(7, 25)),
-            .selfId = 2,
-            .targetId = 2,
-            .targetMap = .town,
-            .startOffset = .left,
-        },
-        .town => .{
-            .rect = .init(.xy(1, 227), .xy(7, 25)),
-            .selfId = 2,
-            .targetId = 2,
-            .targetMap = .home_exterior,
-            .startOffset = .right,
-        },
+        .home_exterior => linkTrigger(.init(.xy(552, 227), .xy(7, 25)), .town, .left),
+        .town => linkTrigger(.init(.xy(1, 227), .xy(7, 25)), .home_exterior, .right),
         else => null,
     };
     if (trigger) |value| _ = factory.spawnMapTrigger(world, value);
@@ -277,19 +266,39 @@ fn loadTrigger(ctx: *const Context, object: tiled.Object) void {
 
     const target = object.getProperty("target_map", []const u8).?;
     const start = object.getProperty("start_offset", []const u8).?;
-    const startOffset = std.meta.stringToEnum(
-        component.map.StartOffset,
-        start,
-    );
+    const offset = std.meta.stringToEnum(StartOffset, start);
+    const rect = object.rect();
 
     const trigger: Trigger = .{
-        .rect = object.rect(),
+        .rect = rect,
         .selfId = object.getProperty("self_id", i32).?,
         .targetId = object.getProperty("target_id", i32).?,
         .targetMap = zhu.enums.to(component.map.Id, target),
-        .startOffset = startOffset orelse .none,
+        .spawn = spawnPosition(rect, offset orelse .none),
     };
     _ = factory.spawnMapTrigger(ctx.world, trigger);
+}
+
+fn linkTrigger(rect: zhu.Rect, target: Id, offset: StartOffset) Trigger {
+    return .{
+        .rect = rect,
+        .selfId = 2,
+        .targetId = 2,
+        .targetMap = target,
+        .spawn = spawnPosition(rect, offset),
+    };
+}
+
+fn spawnPosition(rect: zhu.Rect, startOffset: StartOffset) zhu.Vector2 {
+    const offset = 8;
+    const center = rect.center();
+    return switch (startOffset) {
+        .left => .xy(rect.min.x - offset, center.y),
+        .right => .xy(rect.max().x + offset, center.y),
+        .top => .xy(center.x, rect.min.y - offset),
+        .bottom => .xy(center.x, rect.max().y + offset),
+        .none => center,
+    };
 }
 
 fn loadRest(ctx: *const Context, object: tiled.Object) void {

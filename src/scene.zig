@@ -112,23 +112,19 @@ fn updatePlay(delta: f32) void {
     if (pending != null) return;
     if (clock.paused) return;
 
-    // 已提交的切图请求先进入过渡，不再瞬时换图。
-    if (world.getByIdentity(actor.Player, Transition) != null) {
-        mapFade.fadeOut();
-        return;
-    }
-
     system.update(&world, delta);
     if (world.getByIdentity(actor.Interact, Rest) != null) ui.open(.rest);
 }
 
 fn updateMapFade(delta: f32) bool {
-    if (!mapFade.active()) return false;
+    if (!mapFade.active()) {
+        if (world.getByIdentity(actor.Player, Transition) == null) return false;
+        mapFade.fadeOut();
+    }
 
     if (mapFade.update(delta)) |event| switch (event) {
         .covered => {
-            const playerEntity = world.getIdentity(actor.Player).?;
-            const request = world.get(playerEntity, Transition).?;
+            const request = world.getByIdentity(actor.Player, Transition).?;
             save.captureMap(allocator, &world);
             unloadMap();
             enterMap(.{ .trigger = request });
@@ -232,17 +228,7 @@ fn triggerPosition(targetId: i32) zhu.Vector2 {
     var query = world.query(.{Trigger});
     while (query.next()) |row| {
         const trigger = row.get(Trigger);
-        if (trigger.selfId != targetId) continue;
-
-        const offset = 8;
-        const center = trigger.rect.center();
-        return switch (trigger.startOffset) {
-            .left => .xy(trigger.rect.min.x - offset, center.y),
-            .right => .xy(trigger.rect.max().x + offset, center.y),
-            .top => .xy(center.x, trigger.rect.min.y - offset),
-            .bottom => .xy(center.x, trigger.rect.max().y + offset),
-            .none => center,
-        };
+        if (trigger.selfId == targetId) return trigger.spawn;
     }
     std.debug.panic("missing map trigger {}", .{targetId});
 }
