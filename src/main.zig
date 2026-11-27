@@ -56,6 +56,7 @@ fn deinit(_: std.mem.Allocator) void {
 pub fn main(initInfo: std.process.Init) void {
     zhu.setup(initInfo, .{ .storage = "farm" });
     zhu.window.run("迷你农场", .xy(1280, 720), .{
+        .pack = @import("zon/pack.zon"),
         .logicSize = .xy(640, 360),
         .scaleEnum = .fit,
         .init = init,

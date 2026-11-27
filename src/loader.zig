@@ -39,7 +39,7 @@ pub fn fetch(mapId: Id) void {
     if (cache.contains(mapId)) return;
 
     if (cache.count() == 0) {
-        zhu.assets.loadZlib("maps/tileSet.zlib", 0, struct {
+        zhu.assets.loadBytes("maps/tileSet.bin", 0, struct {
             fn callback(_: u64, bytes: []const u8) void {
                 const gpa = arena.allocator();
                 tileSets = tiled.decodeTileSets(bytes, gpa) catch |err|
@@ -49,9 +49,9 @@ pub fn fetch(mapId: Id) void {
     }
     cache.put(mapId, null);
     const path: []const u8 = switch (mapId) {
-        inline else => |tag| "maps/" ++ @tagName(tag) ++ ".zlib",
+        inline else => |tag| "maps/" ++ @tagName(tag) ++ ".bin",
     };
-    zhu.assets.loadZlib(path, @backingInt(mapId), struct {
+    zhu.assets.loadBytes(path, @backingInt(mapId), struct {
         fn callback(handle: u64, bytes: []const u8) void {
             const id: Id = @fromBackingInt(@intCast(handle));
             const gpa = arena.allocator();

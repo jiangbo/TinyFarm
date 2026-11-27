@@ -39,11 +39,11 @@ pub fn build(b: *std.Build) !void {
     });
     zhuBuild.installEmsdk(b, zhuyu);
 
-    // 将现有素材原样安装到对应平台的运行目录。
     const assets = b.addInstallDirectory(.{
         .source_dir = b.path("assets"),
         .install_dir = if (web) .prefix else .bin,
         .install_subdir = if (web) "web/assets" else "assets",
+        .exclude_extensions = &.{ ".bin", ".zlib" },
     });
     b.getInstallStep().dependOn(&assets.step);
 
@@ -82,9 +82,15 @@ pub fn build(b: *std.Build) !void {
     });
     zhuBuild.tiled.addStep(b, zhuyu, .{
         .input = "raw-assets",
-        .format = .zlib,
+        .format = .bin,
         .terrain = true,
         .tileSetDir = "maps",
+    });
+    _ = zhuBuild.pack.addStep(b, zhuyu, .{
+        .include = &.{"maps/"},
+        .output = "maps.pack",
+        .metadata = "src/zon/pack.zon",
+        .zlib = true,
     });
     zhuBuild.audio.addStep(b, zhuyu, .{ .rate = 11025, .quality = 0 });
     // 兼容原始素材目录；目标已存在时保留两个文件。

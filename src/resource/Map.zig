@@ -89,7 +89,7 @@ pub fn bindSoil(self: *Map, sets: []const tiled.TileSet) void {
         };
         return;
     }
-    @panic("soil terrain rules are missing from maps/tileSet.zlib");
+    @panic("soil terrain rules are missing from maps/tileSet");
 }
 
 pub fn deinit(self: *Map, gpa: Allocator) void {
