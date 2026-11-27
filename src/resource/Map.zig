@@ -12,6 +12,14 @@ const farm = component.farm;
 const SolidRange = component.map.SolidRange;
 const AnimatedTile = struct { vertex: usize, animation: zhu.Animation };
 
+pub const groundTileSet: zhu.extend.tiled.TileSet = blk: {
+    const sets: []const zhu.extend.tiled.TileSet = @import("../zon/tileSet.zon");
+    for (sets) |set| {
+        if (set.getWangSet("soil") != null) break :blk set;
+    }
+    @compileError("soil terrain rules are missing; run zig build tiled");
+};
+
 const TileObject = struct {
     const Kind = enum { crop, product, chest };
     kind: Kind,
@@ -56,6 +64,8 @@ areas: std.ArrayList(zhu.Rect) = .empty,
 vertexes: std.ArrayList(zhu.Vertex) = .empty,
 animatedTiles: std.ArrayList(AnimatedTile) = .empty,
 frontStart: usize = 0,
+groundVertexes: std.ArrayList(zhu.Vertex) = .empty,
+groundDirty: bool = true,
 
 pub fn init(gpa: Allocator, id: component.map.Id, grid: spatial.Grid) Map {
     const tiles = gpa.alloc(Tile, grid.count()) catch zhu.oom();
@@ -68,7 +78,40 @@ pub fn deinit(self: *Map, gpa: Allocator) void {
     self.collision.deinit(gpa);
     self.areas.clearAndFree(gpa);
     self.vertexes.clearAndFree(gpa);
+    self.groundVertexes.clearAndFree(gpa);
     self.animatedTiles.clearAndFree(gpa);
+}
+
+pub fn setGround(self: *Map, index: usize, ground: ?farm.Ground) void {
+    const tile = &self.tiles[index];
+    if (tile.ground == ground) return;
+    tile.ground = ground;
+    self.groundDirty = true;
+}
+
+/// 地表变化后整图重建，保留数组容量；由 render.update 调用，draw 只提交结果。
+pub fn updateGround(self: *Map, gpa: Allocator, land: zhu.Image) void {
+    if (!self.groundDirty) return;
+    self.groundVertexes.clearRetainingCapacity();
+    for (self.tiles, 0..) |tile, index| {
+        const ground = tile.ground orelse continue;
+        const position = self.grid.indexToWorld(index);
+        const layers: usize = if (ground == .wet) 2 else 1;
+        for (0..layers) |layer| {
+            const id = groundTileId(self, index, layer == 1);
+            const col: f32 = @floatFromInt(id % groundTileSet.columns);
+            const row: f32 = @floatFromInt(id / groundTileSet.columns);
+            const offset = zhu.Vector2.xy(col, row).mul(groundTileSet.tileSize);
+            const image = land.sub(.init(offset, groundTileSet.tileSize));
+            self.groundVertexes.append(gpa, .{
+                .position = position,
+                .layer = image.layer,
+                .size = image.size,
+                .uvRect = image.uvRect(),
+            }) catch zhu.oom();
+        }
+    }
+    self.groundDirty = false;
 }
 
 pub fn advanceAnimations(self: *Map, delta: f32) void {
@@ -82,31 +125,18 @@ pub fn advanceAnimations(self: *Map, delta: f32) void {
 pub fn drawBack(self: *const Map, image: zhu.Image) void {
     const vertexes = self.vertexes.items;
     if (vertexes.len == 0) return;
-    // 只有前景时也要为后续耕地顶点开启批次。
     zhu.batch.drawVertices(image, vertexes[0..self.frontStart]);
 }
 
-pub fn drawGround(self: *const Map, dry: zhu.Image, wet: zhu.Image) void {
-    for (self.tiles, 0..) |tile, index| {
-        const ground = tile.ground orelse continue;
-        const position = self.grid.indexToWorld(index);
-        appendGroundVertex(position, dry);
-        if (ground == .wet) appendGroundVertex(position, wet);
-    }
+pub fn drawGround(self: *const Map, image: zhu.Image) void {
+    std.debug.assert(!self.groundDirty);
+    if (self.groundVertexes.items.len == 0) return;
+    zhu.batch.drawVertices(image, self.groundVertexes.items);
 }
 
 pub fn drawFront(self: *const Map, image: zhu.Image) void {
     const front = self.vertexes.items[self.frontStart..];
     if (front.len != 0) zhu.batch.drawVertices(image, front);
-}
-
-fn appendGroundVertex(position: zhu.Vector2, image: zhu.Image) void {
-    zhu.assets.gpu.addVertex(.{
-        .position = position,
-        .layer = image.layer,
-        .size = image.size,
-        .uvRect = image.uvRect(),
-    });
 }
 
 pub fn getTile(self: *const Map, position: zhu.Vector2) ?*Tile {
@@ -126,4 +156,78 @@ pub fn clearProduct(self: *Map, index: usize, solid: ?SolidRange) void {
     }
     // gone 只记录在触发销毁的格子上。
     self.tiles[index].gone = .product;
+}
+
+fn groundTileId(current: *const Map, index: usize, wet: bool) u32 {
+    const Cell = zhu.extend.spatial.Cell;
+    const rules = comptime groundTileSet.getWangSet("soil").?;
+    const color = rules.getColorIndex(if (wet) "wet" else "tilled").?;
+    const width: usize = @intCast(current.grid.width);
+    const cell = Cell.xy(@intCast(index % width), @intCast(index / width));
+    const offsets = [_]Cell{
+        Cell.xy(0, -1), Cell.xy(1, -1), Cell.xy(1, 0),  Cell.xy(1, 1),
+        Cell.xy(0, 1),  Cell.xy(-1, 1), Cell.xy(-1, 0), Cell.xy(-1, -1),
+    };
+    var colors: [8]u8 = @splat(0);
+    for (offsets, 0..) |offset, i| {
+        const neighbor = Cell.xy(cell.x + offset.x, cell.y + offset.y);
+        const next = current.grid.cellToIndex(neighbor) orelse continue;
+        const ground = current.tiles[next].ground orelse continue;
+        if (!wet or ground == .wet) colors[i] = color;
+    }
+    // 对角连接仅在相邻两条边都连接时生效。
+    for ([_]usize{ 1, 3, 5, 7 }) |i| {
+        if (colors[i - 1] == 0 or colors[(i + 1) % 8] == 0) colors[i] = 0;
+    }
+    // 素材未定义孤立格规则，沿用原有的干地和湿地单格贴图。
+    if (std.mem.allEqual(u8, &colors, 0)) return if (wet) 84 else 72;
+    return rules.getTileId(colors).?;
+}
+
+test "耕地跨干湿连接，湿地只连接湿地，孤立格忽略对角邻居" {
+    var current = Map.init(std.testing.allocator, .home_exterior, .{
+        .width = 3,
+        .height = 3,
+        .cellSide = 16,
+    });
+    defer current.deinit(std.testing.allocator);
+    current.setGround(4, .wet);
+    current.setGround(1, .wet);
+    current.setGround(2, .wet);
+    current.setGround(5, .dry);
+
+    try std.testing.expectEqual(80, groundTileId(&current, 4, false));
+    try std.testing.expectEqual(60, groundTileId(&current, 4, true));
+
+    current.setGround(1, .dry);
+    try std.testing.expectEqual(80, groundTileId(&current, 4, false));
+    try std.testing.expectEqual(84, groundTileId(&current, 4, true));
+
+    current.setGround(1, null);
+    current.setGround(5, null);
+    try std.testing.expectEqual(72, groundTileId(&current, 4, false));
+    try std.testing.expectEqual(84, groundTileId(&current, 4, true));
+}
+
+test "地表缓存重建不残留旧湿地层或已清除地块" {
+    const gpa = std.testing.allocator;
+    var current = Map.init(gpa, .home_exterior, .{
+        .width = 1,
+        .height = 1,
+        .cellSide = 16,
+    });
+    defer current.deinit(gpa);
+    const land = zhu.Image{ .size = .xy(384, 128) };
+
+    current.setGround(0, .wet);
+    current.updateGround(gpa, land);
+    try std.testing.expectEqual(2, current.groundVertexes.items.len);
+
+    current.setGround(0, .dry);
+    current.updateGround(gpa, land);
+    try std.testing.expectEqual(1, current.groundVertexes.items.len);
+
+    current.setGround(0, null);
+    current.updateGround(gpa, land);
+    try std.testing.expectEqual(0, current.groundVertexes.items.len);
 }

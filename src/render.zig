@@ -41,8 +41,7 @@ var gradientImage: zhu.Image = undefined;
 var glowImage: zhu.Image = undefined;
 var spotImage: zhu.Image = undefined;
 var mapImage: zhu.Image = undefined;
-var dryLandImage: zhu.Image = undefined;
-var wetLandImage: zhu.Image = undefined;
+var landImage: zhu.Image = undefined;
 
 pub fn init() void {
     canvas = zhu.graphics.createRenderTarget(zhu.camera.size, .nearest);
@@ -59,16 +58,17 @@ pub fn init() void {
     glowImage = zhu.getImage("light.png").?.withFilter(.linear);
     spotImage = zhu.getImage("spot.png").?.withFilter(.linear);
     mapImage = zhu.getImage("circle.png").?;
-    const land = zhu.getImage(
-        "farm-rpg/Farm/Tileset/Modular/Tilled Soil and wet soil.png",
-    ).?;
-    dryLandImage = land.sub(.init(.xy(0, 48), .xy(16, 16)));
-    wetLandImage = land.sub(.init(.xy(192, 48), .xy(16, 16)));
+    landImage = zhu.assets.getImage(Map.groundTileSet.image).?;
 }
 
 pub fn deinit() void {
     canvas.deinit();
     lightCanvas.deinit();
+}
+
+pub fn update(world: *World, gpa: std.mem.Allocator) void {
+    const current = world.getResourcePtr(Map) orelse return;
+    current.updateGround(gpa, landImage);
 }
 
 pub fn draw(world: *const World) void {
@@ -94,7 +94,7 @@ pub fn draw(world: *const World) void {
 
     zhu.batch.useTarget(clearColor, .{ .target = &canvas });
     current.drawBack(mapImage);
-    current.drawGround(dryLandImage, wetLandImage);
+    current.drawGround(landImage);
     drawSprites(world);
     current.drawFront(mapImage);
     drawTarget(world, current.grid.cellSize());

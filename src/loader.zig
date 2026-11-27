@@ -108,6 +108,7 @@ fn parseSolidLayer(ctx: *const Context, layer: *const tiled.Layer) void {
     const collision = &ctx.loaded.collision;
     const grid = ctx.loaded.grid;
     for (layer.data, 0..) |gid, index| {
+        std.debug.assert(gid & 0xF0000000 == 0);
         if (gid != 0) collision.setCellsInRect(grid.indexToRect(index));
     }
 }
@@ -118,6 +119,7 @@ fn parseTileLayer(ctx: *const Context, layer: *const tiled.Layer) void {
     for (layer.data, 0..) |globalId, index| {
         if (globalId == 0) continue; // 0 表示空瓦片，跳过
 
+        std.debug.assert(globalId & 0xF0000000 == 0);
         if (rockLayer) {
             loadRockTile(ctx, globalId, index);
             continue;
@@ -140,9 +142,9 @@ fn parseTileLayer(ctx: *const Context, layer: *const tiled.Layer) void {
     }
 }
 
-fn loadRockTile(ctx: *const Context, globalId: u32, index: usize) void {
+fn loadRockTile(ctx: *const Context, gid: u32, index: usize) void {
     const rect = ctx.loaded.grid.indexToRect(index);
-    const entity = factory.spawnMapTile(ctx.world, ctx.source.*, globalId, rect);
+    const entity = factory.spawnMapTile(ctx.world, ctx.source.*, gid, rect);
     if (!ctx.world.has(entity, item.Product)) return;
 
     const start = ctx.loaded.areas.items.len;
@@ -164,10 +166,10 @@ const TileFlag = enum {
     OCCUPIED,
 };
 
-fn loadFlags(ctx: *const Context, index: usize, flags: []const u8) void {
+fn loadFlags(ctx: *const Context, index: usize, names: []const u8) void {
     const tile = ctx.loaded.grid.indexToRect(index);
     const half = tile.size.x * 0.5;
-    var iter = std.mem.tokenizeScalar(u8, flags, ',');
+    var iter = std.mem.tokenizeScalar(u8, names, ',');
     while (iter.next()) |raw| {
         const token = std.mem.trim(u8, raw, " \t\r\n");
         const flag = std.meta.stringToEnum(TileFlag, token) orelse
@@ -210,6 +212,7 @@ fn addImage(ctx: *const Context, position: zhu.Vector2, image: zhu.Image) void {
 }
 
 fn parseObjectLayer(ctx: *const Context, layer: *const tiled.Layer) void {
+    for (layer.objects) |object| std.debug.assert(object.gid & 0xF0000000 == 0);
     if (layer.isNamed("collider")) {
         for (layer.objects) |object| {
             addSolidRect(ctx, object.rect());
@@ -354,8 +357,7 @@ fn addSolidObject(ctx: *const Context, object: tiled.Object) SolidRange {
     const topLeft = object.topLeft();
 
     for (group.objects) |local| {
-        const position = topLeft.add(local.position);
-        addSolidRect(ctx, .init(position, local.size));
+        addSolidRect(ctx, .init(topLeft.add(local.position), local.size));
     }
     return .{
         .start = start,
@@ -404,7 +406,6 @@ test "对象层产出对象按碰撞范围占用格子" {
         .size = .xy(16, 16),
         .point = false,
         .properties = &.{},
-        .extend = .{},
     }};
     const objectGroup = tiled.ObjectGroup{
         .visible = true,
@@ -421,19 +422,18 @@ test "对象层产出对象按碰撞范围占用格子" {
         .columns = 1,
         .tileCount = 1,
         .image = imageId,
-        .tileSize = .xy(16, 16),
+        .tileSize = .xy(32, 16),
         .tiles = &tiles,
     }};
     const objects = [_]tiled.Object{.{
         .id = 1,
-        .gid = 0x01000000,
+        .gid = 1,
         .name = "",
         .type = "",
         .position = .xy(0, 16),
         .size = .xy(32, 16),
         .point = false,
         .properties = &.{},
-        .extend = .{},
     }};
     const layers = [_]tiled.Layer{.{
         .id = 1,
@@ -450,6 +450,7 @@ test "对象层产出对象按碰撞范围占用格子" {
         .grid = .{ .width = 3, .height = 1, .cellSide = 16 },
         .layers = &layers,
         .tileSets = &testTileSets,
+        .tileSetRefs = &.{.{ .firstGid = 1, .id = tileSetId }},
     };
 
     const gpa = std.testing.allocator;

@@ -278,7 +278,7 @@ fn advanceStateOneDay(state: *Map) void {
 
 fn applyTiles(current: *MapResource, world: *World, tiles: []const Tile) void {
     for (tiles) |saved| {
-        current.tiles[saved.index].ground = saved.ground;
+        current.setGround(saved.index, saved.ground);
         const object = saved.object orelse continue;
         restoreObject(current, world, saved.index, object);
     }

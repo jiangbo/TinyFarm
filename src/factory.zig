@@ -316,11 +316,7 @@ fn chestItems(object: Object) item.Counts {
     return result;
 }
 
-fn mapObjectSortY(
-    object: Object,
-    tile: *const tiled.Tile,
-    size: zhu.Vector2,
-) f32 {
+fn mapObjectSortY(object: Object, tile: *const tiled.Tile, size: zhu.Vector2) f32 {
     const group = tile.objectGroup orelse return object.position.y;
     var result: f32 = 0;
     var found = false;
@@ -546,6 +542,7 @@ test "地图摆件按底边定位生成实体" {
         .grid = .{ .width = 1, .height = 1, .cellSide = 16 },
         .layers = &.{},
         .tileSets = &tileSets,
+        .tileSetRefs = &.{.{ .firstGid = 1, .id = tileSetId }},
     };
 
     var world = World.init(std.testing.allocator);
@@ -553,14 +550,13 @@ test "地图摆件按底边定位生成实体" {
 
     const entity = spawnMapObject(&world, testMap, .{
         .id = 1,
-        .gid = 0x01000000,
+        .gid = 1,
         .name = "",
         .type = "",
         .position = .xy(12, 34),
         .size = .xy(20, 30),
         .point = false,
         .properties = &.{},
-        .extend = .{},
     });
 
     const position = world.get(entity, component.Position).?;
@@ -586,7 +582,6 @@ test "地图摆件优先用碰撞底边作为排序点" {
         .size = .xy(16, 8),
         .point = false,
         .properties = &.{},
-        .extend = .{},
     }};
     const tiles = [_]tiled.Tile{.{
         .id = imageId,
@@ -606,6 +601,7 @@ test "地图摆件优先用碰撞底边作为排序点" {
         .grid = .{ .width = 1, .height = 1, .cellSide = 16 },
         .layers = &.{},
         .tileSets = &tileSets,
+        .tileSetRefs = &.{.{ .firstGid = 1, .id = tileSetId }},
     };
 
     var world = World.init(std.testing.allocator);
@@ -613,14 +609,13 @@ test "地图摆件优先用碰撞底边作为排序点" {
 
     const entity = spawnMapObject(&world, testMap, .{
         .id = 1,
-        .gid = 0x01000000,
+        .gid = 1,
         .name = "",
         .type = "",
         .position = .xy(12, 50),
         .size = .xy(20, 40),
         .point = false,
         .properties = &.{},
-        .extend = .{},
     });
 
     const position = world.get(entity, component.Position).?;
@@ -665,6 +660,7 @@ test "带 anim_id 的地图摆件会创建停止的非循环动画" {
         .grid = .{ .width = 1, .height = 1, .cellSide = 16 },
         .layers = &.{},
         .tileSets = &tileSets,
+        .tileSetRefs = &.{.{ .firstGid = 1, .id = tileSetId }},
     };
 
     var world = World.init(std.testing.allocator);
@@ -672,14 +668,13 @@ test "带 anim_id 的地图摆件会创建停止的非循环动画" {
 
     const entity = spawnMapObject(&world, testMap, .{
         .id = 1,
-        .gid = 0x01000000,
+        .gid = 1,
         .name = "",
         .type = "",
         .position = .xy(12, 34),
         .size = .zero,
         .point = false,
         .properties = &.{},
-        .extend = .{},
     });
 
     const animation = world.get(entity, actor.Animation).?;

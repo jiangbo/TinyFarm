@@ -26,10 +26,10 @@ pub fn update(world: *World) void {
 
     const current = world.getResourcePtr(Map).?;
     for (days) |_| {
-        for (current.tiles) |*tile| {
+        for (current.tiles, 0..) |*tile, index| {
             // 浇水只影响当天，跨天后湿地变干。
             const watered = tile.ground == .wet;
-            if (watered) tile.ground = .dry;
+            if (watered) current.setGround(index, .dry);
 
             const entity = tile.get(.crop) orelse continue;
             const crop = world.getPtr(entity, Crop).?;
@@ -78,7 +78,7 @@ fn hoe(current: *Map, position: zhu.Vector2) bool {
     if (marks.contains(.occupied)) return false;
     const body: zhu.Shape = .{ .rect = current.grid.indexToRect(index) };
     if (current.collision.overlaps(body)) return false;
-    tile.ground = .dry;
+    current.setGround(index, .dry);
     return true;
 }
 
@@ -116,9 +116,10 @@ fn useSeed(world: *World, current: *Map, want: WantUse, kind: CropEnum) void {
 }
 
 fn water(world: *World, current: *Map, position: zhu.Vector2) void {
-    const tile = current.getTile(position) orelse return;
+    const index = current.grid.worldToIndex(position) orelse return;
+    const tile = &current.tiles[index];
     if (tile.ground == null) return;
-    tile.ground = .wet;
+    current.setGround(index, .wet);
 
     if (tile.get(.crop)) |entity| {
         world.getPtr(entity, Crop).?.watered = true;

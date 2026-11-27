@@ -70,8 +70,7 @@ pub fn update(delta: f32) void {
         .title => if (title.update(&world, delta)) |req| {
             pending = .{ .play = req };
         },
-        .play => {
-            if (updateMapFade(delta)) return;
+        .play => if (!updateMapFade(delta)) {
             if (ui.update(&world, delta)) |req| switch (req) {
                 .block => {},
                 .title => pending = .title,
@@ -82,6 +81,7 @@ pub fn update(delta: f32) void {
             }
         },
     }
+    render.update(&world, allocator);
 }
 
 pub fn draw() void {
