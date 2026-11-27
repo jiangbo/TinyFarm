@@ -92,8 +92,9 @@
   地图保留 Tiled 瓦片编号和按 firstGid 排序的瓦片集引用，通过稳定 ID 查询瓦片集。
   ZhuYu 导出时保留原生 GID，查询瓦片时屏蔽高四位。Farm 当前地图要求 GID 高四位
   为零，加载瓦片层和对象层时以断言检查。
-  Tiled 工具的 mergeTileSets 默认 true，合并为 tileSet.zon；关闭时保留各 TSJ
-  相对于输入目录的路径，扩展名改为 .zon。terrain 独立控制是否导出地形规则。
+  Tiled 工具默认合并瓦片集，当前输出为 `assets/maps/tileSet.zlib`。
+  `terrain` 控制是否导出地形规则，地图和耕地都使用这份运行时瓦片集。
+  地图和瓦片集分别保存在 `assets/maps/` 下，由 `zhu.assets.load` 按需加载和解压。
   地图和种子枚举名与 Tiled 配置一致，生成产物可重复生成，游戏在进图时补充
   住宅室外与城镇的双向触发器。通用网格已归入 ZhuYu 的 `spatial`，不做 `.world`。
 

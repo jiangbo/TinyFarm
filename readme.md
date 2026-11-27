@@ -45,11 +45,12 @@ zig build tiled
 | `atlas` | 筛选图片并预乘 Alpha，生成固定 1024×1024 的图集到 `assets/atlas/`，更新 `src/zon/atlas.zon`，同时引用字体页面 |
 | `audio` | 输出到 `assets/audio/`，采样率 11025Hz，Vorbis 质量 0 |
 | `copy` | 更新首页背景、鼠标光标和窗口图标到 `assets/` |
-| `tiled` | 读取 `raw-assets/maps/` 下的 `.tmj` 和 `.tsj`，生成 `src/zon/maps/` 下的地图和 `src/zon/tileSet.zon` |
+| `tiled` | 从 `raw-assets/maps/` 生成 `assets/maps/` 下的地图和瓦片集 `.zlib` |
 
 `fontbm`、`atlas` 和 `audio` 会清空各自的输出目录后重建。修改源码中的文字后，依次运行
 `fontbm`、`atlas`；修改图集素材后运行 `atlas`；修改音频后运行 `audio`。
 修改首页背景、鼠标光标或窗口图标后运行 `zig build copy`。
+修改 Tiled 素材后运行 `zig build tiled`。构建时安装已生成的地图和瓦片集，游戏按需加载。
 
 ## 构建与运行
 
