@@ -48,7 +48,7 @@ pub const Item = struct {
     name: []const u8,
     category: []const u8,
     description: []const u8,
-    limit: u32 = 99,
+    limit: u32,
     icon: Sprite,
     product: ?item.Stack = null,
     hit: ?item.Product = null,

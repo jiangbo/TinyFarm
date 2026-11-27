@@ -204,7 +204,7 @@
             .name = "草莓种子",
             .category = "种子",
             .description = "种下后会长出草莓。",
-            .limit = 99,
+            .limit = 999,
             .icon = .{
                 // .path = "farm-rpg/Icons/Crops.png"
                 .imageId = 2346538291,
@@ -216,7 +216,7 @@
             .name = "土豆种子",
             .category = "种子",
             .description = "种下后会长出土豆。",
-            .limit = 99,
+            .limit = 999,
             .icon = .{
                 // .path = "farm-rpg/Icons/Crops.png"
                 .imageId = 2346538291,
@@ -228,7 +228,7 @@
             .name = "草莓",
             .category = "作物",
             .description = "成熟后收获的水果。",
-            .limit = 99,
+            .limit = 999,
             .product = .{ .item = .strawberry_seed, .count = 3 },
             .icon = .{
                 // .path = "farm-rpg/Icons/Crops.png"
@@ -241,7 +241,7 @@
             .name = "土豆",
             .category = "作物",
             .description = "成熟后收获的根茎作物。",
-            .limit = 99,
+            .limit = 999,
             .product = .{ .item = .potato_seed, .count = 3 },
             .icon = .{
                 // .path = "farm-rpg/Icons/Crops.png"
@@ -254,7 +254,7 @@
             .name = "木材",
             .category = "材料",
             .description = "砍伐树木得到的基础材料。",
-            .limit = 99,
+            .limit = 999,
             .icon = .{
                 // .path = "farm-rpg/Icons/Weapons/14.png"
                 .imageId = 563877801,
@@ -269,7 +269,7 @@
             .name = "石头",
             .category = "材料",
             .description = "敲碎石块得到的基础材料。",
-            .limit = 99,
+            .limit = 999,
             .icon = .{
                 // .path = "farm-rpg/Icons/Weapons/14.png"
                 .imageId = 563877801,

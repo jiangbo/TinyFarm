@@ -176,7 +176,8 @@ test "背包只有部分空间时 pickup 只减少已拾取数量" {
     for (&inv.store.stacks) |*stack| {
         stack.* = .{ .item = .hoe, .count = 1 };
     }
-    inv.store.stacks[0] = .{ .item = .potato, .count = 98 };
+    const limit = factory.itemConfig(.potato).limit;
+    inv.store.stacks[0] = .{ .item = .potato, .count = limit - 1 };
 
     const pickup = world.createEntity();
     world.add(pickup, Position.xy(0, 0));
@@ -185,7 +186,7 @@ test "背包只有部分空间时 pickup 只减少已拾取数量" {
 
     update(&world, 0.016);
 
-    try std.testing.expectEqual(@as(u32, 99), inv.store.get(0).?.count);
+    try std.testing.expectEqual(limit, inv.store.get(0).?.count);
     try std.testing.expectEqual(@as(u32, 2), world.get(pickup, Pickup).?.count);
     try std.testing.expectEqual(0, world.getEvent(event.SoundPlay).len);
 }

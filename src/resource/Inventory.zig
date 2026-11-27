@@ -299,7 +299,7 @@ test "使用物品空间不足时返回 full 且不绑定产物" {
     var inv: Self = .{};
     inv.reset();
 
-    @memset(&inv.store.stacks, .{ .item = .potato, .count = 99 });
+    @memset(&inv.store.stacks, .{ .item = .potato, .count = 1 });
     inv.store.stacks[0] = .{ .item = .strawberry, .count = 2 };
 
     const result = inv.useAt(0);
