@@ -80,7 +80,12 @@ pub fn build(b: *std.Build) !void {
         .maxSize = 1024,
         .fixed = true,
     });
-    zhuBuild.tiled.addStep(b, zhuyu, .{ .input = "raw-assets", .terrain = true });
+    zhuBuild.tiled.addStep(b, zhuyu, .{
+        .input = "raw-assets",
+        .format = .zlib,
+        .terrain = true,
+        .tileSetDir = "maps",
+    });
     zhuBuild.audio.addStep(b, zhuyu, .{ .rate = 11025, .quality = 0 });
     // 兼容原始素材目录；目标已存在时保留两个文件。
     const oldCrop = "raw-assets/farm-rpg/Farm Crops/Spring/Spring Crops.png";

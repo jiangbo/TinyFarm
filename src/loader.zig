@@ -8,6 +8,7 @@ const Map = @import("resource/Map.zig");
 
 const tiled = zhu.extend.tiled;
 const spatial = zhu.extend.spatial;
+const Allocator = std.mem.Allocator;
 const World = ecs.World;
 const Position = component.Position;
 const actor = component.actor;
@@ -18,28 +19,73 @@ const Trigger = component.map.Trigger;
 const SolidRange = component.map.SolidRange;
 const StartOffset = enum { none, left, right, top, bottom };
 
-const maps = tiled.bind(@import("zon/tileSet.zon"), &.{
-    @import("zon/maps/school.zon"),
-    @import("zon/maps/town.zon"),
-    @import("zon/maps/home_exterior.zon"),
-    @import("zon/maps/home_interior.zon"),
-});
+var cache: std.EnumMap(Id, ?tiled.Map) = .empty;
+var arena: std.heap.ArenaAllocator = undefined;
+var tileSets: ?[]const tiled.TileSet = null;
 
-pub fn definition(id: Id) *const tiled.Map {
-    return &maps[@backingInt(id)];
+pub fn init(gpa: Allocator) void {
+    arena = .init(gpa);
+}
+
+pub fn deinit(world: *World) void {
+    unload(world);
+    arena.deinit();
+    cache = .empty;
+    tileSets = null;
+}
+
+/// 预取地图，已请求过的地图直接复用缓存。
+pub fn fetch(mapId: Id) void {
+    if (cache.contains(mapId)) return;
+
+    if (cache.count() == 0) {
+        zhu.assets.loadZlib("maps/tileSet.zlib", 0, struct {
+            fn callback(_: u64, bytes: []const u8) void {
+                const gpa = arena.allocator();
+                tileSets = tiled.decodeTileSets(bytes, gpa) catch |err|
+                    zhu.panic("failed to decode tilesets: {}", .{err});
+            }
+        }.callback);
+    }
+    cache.put(mapId, null);
+    const path: []const u8 = switch (mapId) {
+        inline else => |tag| "maps/" ++ @tagName(tag) ++ ".zlib",
+    };
+    zhu.assets.loadZlib(path, @backingInt(mapId), struct {
+        fn callback(handle: u64, bytes: []const u8) void {
+            const id: Id = @fromBackingInt(@intCast(handle));
+            const gpa = arena.allocator();
+            const map = tiled.decodeMap(bytes, gpa) catch |err|
+                zhu.panic("failed to decode map {s}: {}", .{ @tagName(id), err });
+            cache.put(id, map);
+        }
+    }.callback);
+}
+
+pub fn unload(world: *World) void {
+    const map = world.getResourcePtr(Map) orelse return;
+    map.deinit(world.allocator);
+    world.removeResource(Map);
+    world.resetKeepResources();
 }
 
 const Context = struct {
-    gpa: std.mem.Allocator,
+    gpa: Allocator,
     world: *World,
     source: *const tiled.Map,
     loaded: *Map,
 };
 
-pub fn load(gpa: std.mem.Allocator, world: *World, id: Id) Map {
-    const map = definition(id);
+/// 预取完成后创建实体并返回地图资源，等待期间返回 null。
+pub fn load(world: *World, id: Id) ?Map {
+    std.debug.assert(world.getResourcePtr(Map) == null);
+    var map = cache.getAssertContains(id) orelse return null;
+    map.tileSets = tileSets orelse return null;
+
+    const gpa = world.allocator;
     const grid = map.grid;
     var loaded = Map.init(gpa, id, grid);
+    loaded.bindSoil(map.tileSets);
     loaded.props.outdoor = switch (id) {
         .town, .home_exterior => true,
         .school, .home_interior => false,
@@ -60,7 +106,7 @@ pub fn load(gpa: std.mem.Allocator, world: *World, id: Id) Map {
         .cellSide = @divExact(grid.cellSide, 2),
     }) catch zhu.oom();
 
-    parseLayers(&.{ .gpa = gpa, .world = world, .source = map, .loaded = &loaded });
+    parseLayers(&.{ .gpa = gpa, .world = world, .source = &map, .loaded = &loaded });
     // 建表后不再追加矩形，销毁物件只需将对应矩形置空。
     const index = spatial.StaticIndex.build(gpa, grid, loaded.areas.items);
     loaded.collision.index = index catch zhu.oom();
@@ -173,7 +219,7 @@ fn loadFlags(ctx: *const Context, index: usize, names: []const u8) void {
     while (iter.next()) |raw| {
         const token = std.mem.trim(u8, raw, " \t\r\n");
         const flag = std.meta.stringToEnum(TileFlag, token) orelse
-            std.debug.panic("unknown tile_flag token: {s}", .{token});
+            zhu.panic("unknown tile_flag token: {s}", .{token});
         const rect: zhu.Rect = switch (flag) {
             .SOLID => tile,
             .BLOCK_N => .init(tile.min, .xy(tile.size.x, half)),
@@ -252,7 +298,7 @@ fn loadActor(ctx: *const Context, object: tiled.Object) void {
         ctx.world.getPtr(entity, actor.Wander).?.home = object.position;
         return;
     }
-    std.debug.panic("unknown actor object: {s}", .{object.name});
+    zhu.panic("unknown actor object: {s}", .{object.name});
 }
 
 fn loadAnimal(ctx: *const Context, object: tiled.Object) void {

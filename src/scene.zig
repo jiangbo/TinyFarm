@@ -21,22 +21,31 @@ const resource = struct {
 
 const World = ecs.World;
 const actor = component.actor;
+const MapId = component.map.Id;
 const Transition = component.map.Transition;
 const Trigger = component.map.Trigger;
 const defaultZoom: f32 = 2;
 
 const Scene = enum { title, play };
-const Spawn = union(enum) {
-    start: component.map.Id,
-    saved: save.Player,
-    trigger: Transition,
-};
+const Spawn = union(enum) { start, saved: save.Player, trigger: Transition };
 
 pub var world: World = undefined;
 var allocator: std.mem.Allocator = undefined;
-var mapFade: zhu.widget.Fade = .init(0.15);
+var fade: zhu.widget.Fade = .init(0.15);
 var current: Scene = .title;
-var pending: ?union(Scene) { title, play: title.Request } = null;
+var pending: ?union(enum) {
+    start,
+    load,
+    trigger: Transition,
+
+    fn mapId(self: @This()) MapId {
+        return switch (self) {
+            .start => .home_exterior,
+            .load => save.cachedMapId(),
+            .trigger => |trigger| trigger.target,
+        };
+    }
+} = null;
 
 pub fn init(allocator_: std.mem.Allocator) void {
     allocator = allocator_;
@@ -47,6 +56,7 @@ pub fn init(allocator_: std.mem.Allocator) void {
     world.addResource(resource.Notice{});
     world.addResource(resource.Settings.load());
 
+    loader.init(allocator);
     ui.init();
     title.init();
     render.init();
@@ -56,7 +66,7 @@ pub fn init(allocator_: std.mem.Allocator) void {
 pub fn deinit() void {
     pending = null;
     render.deinit();
-    unloadMap();
+    loader.deinit(&world);
     save.deinit(allocator);
     ui.deinit();
     world.deinit();
@@ -64,95 +74,99 @@ pub fn deinit() void {
 
 pub fn update(delta: f32) void {
     zhu.mouse.captured = false;
-    applyScene();
+    if (updateFade(delta)) return;
 
     switch (current) {
-        .title => if (title.update(&world, delta)) |req| {
-            pending = .{ .play = req };
+        .title => {
+            const req = title.update(&world, delta) orelse return;
+            pending = if (req == .start) .start else .load;
         },
-        .play => if (!updateMapFade(delta)) {
-            if (ui.update(&world, delta)) |req| switch (req) {
-                .block => {},
-                .title => pending = .title,
-                .load => restorePlay(),
-            } else {
-                updateZoom();
-                system.update(&world, delta);
-            }
+        .play => if (ui.update(&world, delta)) |req| switch (req) {
+            .block => return,
+            .title => return enterTitle(),
+            .load => pending = .load,
+        } else {
+            updateZoom();
+            system.update(&world, delta);
+            render.update(&world, allocator);
+            const trigger = world.get(actor.Player, Transition);
+            pending = .{ .trigger = trigger orelse return };
         },
     }
-    render.update(&world, allocator);
+
+    const next = pending orelse return;
+    fade.fadeOut();
+    loader.fetch(next.mapId());
 }
 
 pub fn draw() void {
+    if (pending != null and fade.alpha() == 1) {
+        zhu.camera.push(.window);
+        defer zhu.camera.pop();
+        zhu.batch.beginDraw(.black, .{});
+        const pos = zhu.camera.size.scale(0.5);
+        zhu.text.draw("Loading...", pos, .{ .anchor = .center });
+        return;
+    }
+
     switch (current) {
         .title => {
             zhu.batch.beginDraw(.rgb(59, 79, 69), .{});
             title.draw(&world);
         },
-        .play => {
-            render.draw(&world);
-
-            zhu.camera.push(.window);
-            defer zhu.camera.pop();
-            ui.draw(&world);
-            mapFade.draw(.init(.zero, zhu.camera.size), .black);
-        },
+        .play => render.draw(&world),
     }
+
+    zhu.camera.push(.window);
+    defer zhu.camera.pop();
+    if (current == .play) ui.draw(&world);
+    fade.draw(.init(.zero, zhu.camera.size), .black);
 }
 
-fn updateMapFade(delta: f32) bool {
-    if (!mapFade.active()) {
-        if (!world.has(actor.Player, Transition)) return false;
-        mapFade.fadeOut();
+fn updateFade(delta: f32) bool {
+    if (!fade.active()) return false;
+    const event = fade.update(delta);
+    const next = pending orelse return true;
+    if (fade.alpha() < 1) return true;
+    if (event == .covered) {
+        if (next == .trigger) save.captureMap(allocator, &world);
+        loader.unload(&world);
     }
+    const map = loader.load(&world, next.mapId()) orelse return true;
 
-    if (mapFade.update(delta)) |event| switch (event) {
-        .covered => {
-            const request = world.get(actor.Player, Transition).?;
-            save.captureMap(allocator, &world);
-            unloadMap();
-            enterMap(.{ .trigger = request });
-            mapFade.fadeIn();
-        },
-        .clear => {},
-    };
+    pending = null;
+    world.addResource(map);
+
+    if (current == .title) {
+        title.exit();
+        zhu.camera.main.scale = .all(defaultZoom);
+        zhu.music.play("audio/01_spring_journey.ogg", .{ .fadeIn = 0.2 });
+        current = .play;
+    }
+    switch (next) {
+        .start => startPlay(),
+        .load => restorePlay(),
+        .trigger => |trigger| enterMap(.{ .trigger = trigger }),
+    }
+    fade.fadeIn();
     return true;
 }
 
-fn applyScene() void {
-    const next = pending orelse return;
-    pending = null;
-
+fn enterTitle() void {
     ui.close();
-    switch (current) {
-        .title => title.exit(),
-        .play => {
-            mapFade = .init(0.15);
-            unloadMap();
-        },
-    }
-    current = next;
-    switch (next) {
-        .title => title.enter(&world),
-        .play => |req| enterPlay(req),
-    }
+    loader.unload(&world);
+    title.enter(&world);
+    current = .title;
 }
 
-fn enterPlay(req: title.Request) void {
-    const clock = world.getResourcePtr(resource.Clock).?;
-
-    zhu.camera.main.scale = .all(defaultZoom);
-    defer zhu.music.play("audio/01_spring_journey.ogg", .{ .fadeIn = 0.2 });
-    if (req == .load) return restorePlay();
-
+fn startPlay() void {
     // 新游戏从固定初始地图和基础工具开始。
-    clock.reset();
+    world.getResourcePtr(resource.Clock).?.reset();
     world.getResourcePtr(resource.Notice).?.reset();
     world.getResourcePtr(resource.Settings).?.lightOn = false;
-    save.resetMaps();
+    save.resetMaps(allocator);
 
-    enterMap(.{ .start = .home_exterior });
+    enterMap(.start);
     const inv = world.getResourcePtr(resource.Inventory).?;
     inv.reset();
     ui.resetInventory();
@@ -182,7 +196,6 @@ fn updateZoom() void {
 
 fn restorePlay() void {
     const player = save.restoreCached(allocator, &world);
-    unloadMap();
     world.getResourcePtr(resource.Notice).?.reset();
     world.getResourcePtr(resource.Settings).?.lightOn = false;
 
@@ -192,14 +205,8 @@ fn restorePlay() void {
 }
 
 fn enterMap(spawn: Spawn) void {
-    const id = switch (spawn) {
-        .start => |id| id,
-        .saved => |player| player.map,
-        .trigger => |request| request.target,
-    };
-    var loaded = loader.load(allocator, &world, id);
-    save.applyMap(allocator, &world, &loaded);
-    world.addResource(loaded);
+    const loaded = world.getResourcePtr(resource.Map).?;
+    save.applyMap(allocator, &world, loaded);
     zhu.camera.bound = loaded.grid.size();
 
     const position = switch (spawn) {
@@ -212,13 +219,7 @@ fn enterMap(spawn: Spawn) void {
     zhu.camera.directFollow(position);
     system.light.update(&world);
     system.sort.update(&world);
-}
-
-fn unloadMap() void {
-    const loaded = world.getResourcePtr(resource.Map) orelse return;
-    loaded.deinit(allocator);
-    world.removeResource(resource.Map);
-    world.resetKeepResources();
+    render.update(&world, allocator);
 }
 
 fn triggerPosition(targetId: i32) zhu.Vector2 {
@@ -227,5 +228,5 @@ fn triggerPosition(targetId: i32) zhu.Vector2 {
         const trigger = row.get(Trigger);
         if (trigger.selfId == targetId) return trigger.spawn;
     }
-    std.debug.panic("missing map trigger {}", .{targetId});
+    zhu.panic("missing map trigger {}", .{targetId});
 }

@@ -8,16 +8,16 @@ const Map = @This();
 const Allocator = std.mem.Allocator;
 const Entity = ecs.Entity;
 const spatial = zhu.extend.spatial;
+const tiled = zhu.extend.tiled;
 const farm = component.farm;
 const SolidRange = component.map.SolidRange;
 const AnimatedTile = struct { vertex: usize, animation: zhu.Animation };
 
-pub const groundTileSet: zhu.extend.tiled.TileSet = blk: {
-    const sets: []const zhu.extend.tiled.TileSet = @import("../zon/tileSet.zon");
-    for (sets) |set| {
-        if (set.getWangSet("soil") != null) break :blk set;
-    }
-    @compileError("soil terrain rules are missing; run zig build tiled");
+const Soil = struct {
+    rules: *const tiled.WangSet,
+    columns: u32,
+    tileSize: zhu.Vector2,
+    image: zhu.Image,
 };
 
 const TileObject = struct {
@@ -64,6 +64,7 @@ areas: std.ArrayList(zhu.Rect) = .empty,
 vertexes: std.ArrayList(zhu.Vertex) = .empty,
 animatedTiles: std.ArrayList(AnimatedTile) = .empty,
 frontStart: usize = 0,
+soil: ?Soil = null,
 groundVertexes: std.ArrayList(zhu.Vertex) = .empty,
 groundDirty: bool = true,
 
@@ -71,6 +72,24 @@ pub fn init(gpa: Allocator, id: component.map.Id, grid: spatial.Grid) Map {
     const tiles = gpa.alloc(Tile, grid.count()) catch zhu.oom();
     @memset(tiles, .{});
     return .{ .id = id, .grid = grid, .tiles = tiles };
+}
+
+pub fn bindSoil(self: *Map, sets: []const tiled.TileSet) void {
+    std.debug.assert(self.soil == null);
+    for (sets) |set| {
+        const rules = set.getWangSet("soil") orelse continue;
+        std.debug.assert(set.columns != 0);
+        const image = zhu.assets.getImage(set.image) orelse
+            zhu.panic("missing soil image {} in atlas", .{set.image});
+        self.soil = .{
+            .rules = rules,
+            .columns = set.columns,
+            .tileSize = set.tileSize,
+            .image = image,
+        };
+        return;
+    }
+    @panic("soil terrain rules are missing from maps/tileSet.zlib");
 }
 
 pub fn deinit(self: *Map, gpa: Allocator) void {
@@ -90,8 +109,9 @@ pub fn setGround(self: *Map, index: usize, ground: ?farm.Ground) void {
 }
 
 /// 地表变化后整图重建，保留数组容量；由 render.update 调用，draw 只提交结果。
-pub fn updateGround(self: *Map, gpa: Allocator, land: zhu.Image) void {
+pub fn updateGround(self: *Map, gpa: Allocator) void {
     if (!self.groundDirty) return;
+    const soil = self.soil.?;
     self.groundVertexes.clearRetainingCapacity();
     for (self.tiles, 0..) |tile, index| {
         const ground = tile.ground orelse continue;
@@ -99,10 +119,10 @@ pub fn updateGround(self: *Map, gpa: Allocator, land: zhu.Image) void {
         const layers: usize = if (ground == .wet) 2 else 1;
         for (0..layers) |layer| {
             const id = groundTileId(self, index, layer == 1);
-            const col: f32 = @floatFromInt(id % groundTileSet.columns);
-            const row: f32 = @floatFromInt(id / groundTileSet.columns);
-            const offset = zhu.Vector2.xy(col, row).mul(groundTileSet.tileSize);
-            const image = land.sub(.init(offset, groundTileSet.tileSize));
+            const col: f32 = @floatFromInt(id % soil.columns);
+            const row: f32 = @floatFromInt(id / soil.columns);
+            const offset = zhu.Vector2.xy(col, row).mul(soil.tileSize);
+            const image = soil.image.sub(.init(offset, soil.tileSize));
             self.groundVertexes.append(gpa, .{
                 .position = position,
                 .layer = image.layer,
@@ -128,10 +148,10 @@ pub fn drawBack(self: *const Map, image: zhu.Image) void {
     zhu.batch.drawVertices(image, vertexes[0..self.frontStart]);
 }
 
-pub fn drawGround(self: *const Map, image: zhu.Image) void {
+pub fn drawGround(self: *const Map) void {
     std.debug.assert(!self.groundDirty);
     if (self.groundVertexes.items.len == 0) return;
-    zhu.batch.drawVertices(image, self.groundVertexes.items);
+    zhu.batch.drawVertices(self.soil.?.image, self.groundVertexes.items);
 }
 
 pub fn drawFront(self: *const Map, image: zhu.Image) void {
@@ -160,7 +180,7 @@ pub fn clearProduct(self: *Map, index: usize, solid: ?SolidRange) void {
 
 fn groundTileId(current: *const Map, index: usize, wet: bool) u32 {
     const Cell = zhu.extend.spatial.Cell;
-    const rules = comptime groundTileSet.getWangSet("soil").?;
+    const rules = current.soil.?.rules;
     const color = rules.getColorIndex(if (wet) "wet" else "tilled").?;
     const width: usize = @intCast(current.grid.width);
     const cell = Cell.xy(@intCast(index % width), @intCast(index / width));
@@ -184,6 +204,21 @@ fn groundTileId(current: *const Map, index: usize, wet: bool) u32 {
     return rules.getTileId(colors).?;
 }
 
+const testSoil: Soil = .{
+    .rules = &.{
+        .name = "soil",
+        .type = .mixed,
+        .colors = &.{ "tilled", "wet" },
+        .tiles = &.{
+            .{ .tileId = 80, .colors = .{ 1, 1, 1, 0, 0, 0, 0, 0 } },
+            .{ .tileId = 60, .colors = .{ 2, 0, 0, 0, 0, 0, 0, 0 } },
+        },
+    },
+    .columns = 24,
+    .tileSize = .all(16),
+    .image = .{ .size = .xy(384, 128) },
+};
+
 test "耕地跨干湿连接，湿地只连接湿地，孤立格忽略对角邻居" {
     var current = Map.init(std.testing.allocator, .home_exterior, .{
         .width = 3,
@@ -191,6 +226,7 @@ test "耕地跨干湿连接，湿地只连接湿地，孤立格忽略对角邻�
         .cellSide = 16,
     });
     defer current.deinit(std.testing.allocator);
+    current.soil = testSoil;
     current.setGround(4, .wet);
     current.setGround(1, .wet);
     current.setGround(2, .wet);
@@ -217,17 +253,17 @@ test "地表缓存重建不残留旧湿地层或已清除地块" {
         .cellSide = 16,
     });
     defer current.deinit(gpa);
-    const land = zhu.Image{ .size = .xy(384, 128) };
+    current.soil = testSoil;
 
     current.setGround(0, .wet);
-    current.updateGround(gpa, land);
+    current.updateGround(gpa);
     try std.testing.expectEqual(2, current.groundVertexes.items.len);
 
     current.setGround(0, .dry);
-    current.updateGround(gpa, land);
+    current.updateGround(gpa);
     try std.testing.expectEqual(1, current.groundVertexes.items.len);
 
     current.setGround(0, null);
-    current.updateGround(gpa, land);
+    current.updateGround(gpa);
     try std.testing.expectEqual(0, current.groundVertexes.items.len);
 }

@@ -8,7 +8,6 @@ const Inventory = @import("resource/Inventory.zig");
 const MapResource = @import("resource/Map.zig");
 const Settings = @import("resource/Settings.zig");
 const factory = @import("factory.zig");
-const loader = @import("loader.zig");
 
 const World = ecs.World;
 const MapId = component.map.Id;
@@ -44,16 +43,15 @@ pub const Tile = struct {
 
 pub const Map = struct {
     day: u32 = 0,
+    tileCount: u32 = 0, // 写入存档时记录整图格数。
     tiles: []Tile = &.{},
 };
 
-pub const MapRecord = struct {
+const MapRecord = struct {
     maps: std.EnumArray(MapId, Map) = .initFill(.{}),
 
-    pub fn deinit(self: MapRecord, gpa: std.mem.Allocator) void {
-        for (std.enums.values(MapId)) |id| {
-            gpa.free(self.maps.get(id).tiles);
-        }
+    fn deinit(self: MapRecord, gpa: std.mem.Allocator) void {
+        for (self.maps.values) |map| gpa.free(map.tiles);
     }
 };
 
@@ -70,7 +68,7 @@ const slotsPath = "saves/slots.bin";
 
 var slots: ?[10]Slot = null;
 var cached: ?zhu.storage.Loaded(Record) = null;
-var states: MapRecord = .{};
+var states: std.EnumArray(MapId, Map) = .initFill(.{});
 
 pub fn getSlots() *const [10]Slot {
     if (slots) |*loaded| return loaded;
@@ -88,6 +86,10 @@ pub fn readToCache(slot: u8) bool {
     };
     std.log.info("game loaded: {s}", .{path});
     return true;
+}
+
+pub fn cachedMapId() MapId {
+    return cached.?.value.player.map;
 }
 
 pub fn write(world: *const World, slot: u8) bool {
@@ -120,8 +122,7 @@ pub fn deinit(gpa: std.mem.Allocator) void {
     if (cached) |*record| record.deinit();
     cached = null;
     slots = null;
-    states.deinit(gpa);
-    states = .{};
+    resetMaps(gpa);
 }
 
 fn capture(gpa: std.mem.Allocator, world: *const World) Record {
@@ -150,19 +151,14 @@ pub fn restoreCached(gpa: std.mem.Allocator, world: *World) Player {
     const record = &loaded.value;
     world.getResourcePtr(Clock).?.* = record.clock;
     world.getResourcePtr(Settings).?.timeScale = record.timeScale;
-    restoreMaps(gpa, record.maps, record.clock.day);
+    restoreMaps(gpa, record.maps);
     world.getResourcePtr(Inventory).?.* = record.inventory;
     return record.player;
 }
 
-pub fn resetMaps() void {
-    for (std.enums.values(MapId)) |id| {
-        const entry = states.maps.getPtr(id);
-        for (entry.tiles, 0..) |*tile, index| {
-            tile.* = .{ .index = @intCast(index) };
-        }
-        entry.day = 1;
-    }
+pub fn resetMaps(gpa: std.mem.Allocator) void {
+    for (states.values) |map| gpa.free(map.tiles);
+    states = .initFill(.{});
 }
 
 pub fn captureMap(gpa: std.mem.Allocator, world: *const World) void {
@@ -194,9 +190,10 @@ fn captureMaps(gpa: std.mem.Allocator, world: *const World) MapRecord {
     var result: MapRecord = .{};
 
     for (std.enums.values(MapId)) |id| {
-        const state = states.maps.getPtrConst(id);
+        const state = states.getPtrConst(id);
         result.maps.set(id, .{
             .day = state.day,
+            .tileCount = @intCast(state.tiles.len),
             .tiles = captureTiles(gpa, state),
         });
     }
@@ -204,17 +201,28 @@ fn captureMaps(gpa: std.mem.Allocator, world: *const World) MapRecord {
     return result;
 }
 
-fn restoreMaps(gpa: std.mem.Allocator, saved: MapRecord, day: u32) void {
-    resetMaps();
+fn restoreMaps(gpa: std.mem.Allocator, saved: MapRecord) void {
+    resetMaps(gpa);
     for (std.enums.values(MapId)) |id| {
-        const count = loader.definition(id).grid.count();
-        restoreMap(ensure(gpa, id, count, day), saved.maps.get(id));
+        const snapshot = saved.maps.get(id);
+        if (snapshot.tileCount == 0) {
+            std.debug.assert(snapshot.tiles.len == 0);
+            continue;
+        }
+        const state = ensure(gpa, id, snapshot.tileCount, snapshot.day);
+        for (snapshot.tiles) |tile| {
+            std.debug.assert(tile.index < state.tiles.len);
+            state.tiles[tile.index] = tile;
+        }
     }
 }
 
 fn ensure(gpa: std.mem.Allocator, id: MapId, count: usize, day: u32) *Map {
-    const entry = states.maps.getPtr(id);
-    if (entry.tiles.len != 0) return entry;
+    const entry = states.getPtr(id);
+    if (entry.tiles.len != 0) {
+        std.debug.assert(entry.tiles.len == count);
+        return entry;
+    }
 
     entry.tiles = gpa.alloc(Tile, count) catch zhu.oom();
     for (entry.tiles, 0..) |*tile, index| {
@@ -235,19 +243,6 @@ fn captureTiles(gpa: std.mem.Allocator, state: *const Map) []Tile {
     }
 
     return list.toOwnedSlice(gpa) catch zhu.oom();
-}
-
-fn restoreMap(state: *Map, saved: Map) void {
-    for (saved.tiles) |tileSave| {
-        std.debug.assert(tileSave.index < state.tiles.len);
-
-        const index: usize = @intCast(tileSave.index);
-        const tile = &state.tiles[index];
-        tile.ground = tileSave.ground;
-        tile.object = tileSave.object;
-    }
-
-    state.day = saved.day;
 }
 
 fn advanceState(state: *Map, day: u32) void {

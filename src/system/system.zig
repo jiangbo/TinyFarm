@@ -39,7 +39,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
     farm.update(world);
     sort.update(world);
 
-    // 本帧世界结算完后记录下一帧是否需要切图。
+    // 位置结算后生成切图请求。
     transition.update(world);
 
     // 音效最后播放，统一消费本帧前面系统发出的 SoundPlay 事件。
