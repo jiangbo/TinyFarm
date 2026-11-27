@@ -4,11 +4,11 @@
         .navKeys = .{ .cancel = .{ .ESCAPE, .P } },
         .overlay = .{ .r = 0, .g = 0, .b = 0, .a = 115 },
         .panel = .{
-            .size = .{ .x = 360, .y = 298 },
+            .size = .{ .x = 568, .y = 298 },
             .color = .{ .r = 0, .g = 0, .b = 0, .a = 184 },
         },
         .title = .{
-            .position = .{ .x = 180, .y = 22 },
+            .position = .{ .x = 284, .y = 22 },
         },
         .hoverSound = "audio/Fantasy_UI (1).ogg",
         .buttons = .{
@@ -16,7 +16,7 @@
                 .event = 0,
                 .shape = .{ .rect = .{
                     .min = .{ .x = 16, .y = 44 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -64,8 +64,8 @@
             .{
                 .event = 1,
                 .shape = .{ .rect = .{
-                    .min = .{ .x = 184, .y = 44 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .min = .{ .x = 288, .y = 44 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -114,7 +114,7 @@
                 .event = 2,
                 .shape = .{ .rect = .{
                     .min = .{ .x = 16, .y = 84 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -162,8 +162,8 @@
             .{
                 .event = 3,
                 .shape = .{ .rect = .{
-                    .min = .{ .x = 184, .y = 84 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .min = .{ .x = 288, .y = 84 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -212,7 +212,7 @@
                 .event = 4,
                 .shape = .{ .rect = .{
                     .min = .{ .x = 16, .y = 124 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -260,8 +260,8 @@
             .{
                 .event = 5,
                 .shape = .{ .rect = .{
-                    .min = .{ .x = 184, .y = 124 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .min = .{ .x = 288, .y = 124 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -310,7 +310,7 @@
                 .event = 6,
                 .shape = .{ .rect = .{
                     .min = .{ .x = 16, .y = 164 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -358,8 +358,8 @@
             .{
                 .event = 7,
                 .shape = .{ .rect = .{
-                    .min = .{ .x = 184, .y = 164 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .min = .{ .x = 288, .y = 164 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -408,7 +408,7 @@
                 .event = 8,
                 .shape = .{ .rect = .{
                     .min = .{ .x = 16, .y = 204 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -456,8 +456,8 @@
             .{
                 .event = 9,
                 .shape = .{ .rect = .{
-                    .min = .{ .x = 184, .y = 204 },
-                    .size = .{ .x = 160, .y = 32 },
+                    .min = .{ .x = 288, .y = 204 },
+                    .size = .{ .x = 264, .y = 32 },
                 } },
                 .patch = .{
                     .min = .{ .x = 3, .y = 5 },
@@ -506,7 +506,7 @@
                 .label = "Back",
                 .event = 10,
                 .shape = .{ .rect = .{
-                    .min = .{ .x = 100, .y = 250 },
+                    .min = .{ .x = 204, .y = 250 },
                     .size = .{ .x = 160, .y = 32 },
                 } },
                 .patch = .{

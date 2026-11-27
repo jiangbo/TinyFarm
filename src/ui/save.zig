@@ -56,14 +56,25 @@ pub fn draw() void {
     var buffer: [56]u8 = undefined;
     for (save.getSlots(), 0..) |slot, index| {
         const label = switch (slot) {
-            .empty => zhu.format(&buffer, "Slot {d} Empty", .{index + 1}),
-            .valid => |summary| zhu.format(&buffer, "Slot {d} Day {d}", .{
-                index + 1, summary.day,
-            }),
+            .empty => "Empty",
+            .valid => |summary| slotLabel(&buffer, summary),
         };
         menu.drawLabel(index, label);
     }
     popup.draw();
+}
+
+fn slotLabel(buffer: []u8, summary: save.Summary) []const u8 {
+    if (summary.timestamp <= 0)
+        return zhu.format(buffer, "Day {d}", .{summary.day});
+
+    const nanos = @as(i96, summary.timestamp) * std.time.ns_per_s;
+    const date = zhu.localTime(.fromNanoseconds(nanos));
+    const fmt = "Day {d} - {d:0>2}-{d:0>2}-{d:0>2} {d:0>2}:{d:0>2}";
+    return zhu.format(buffer, fmt, .{
+        summary.day,    @abs(@mod(date.year, 100)), @abs(date.month),
+        @abs(date.day), @abs(date.hour),            @abs(date.minute),
+    });
 }
 
 fn openLoad() void {
