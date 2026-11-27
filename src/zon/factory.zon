@@ -505,7 +505,7 @@
                     .offset = .{ .x = 2.5, .y = -2.5 },
                     .size = .{ .x = 16, .y = 16 },
                 },
-                .duration = 5.0,
+                .duration = 1.0,
             },
             .sprout = .{
                 .sprite = .{
@@ -517,7 +517,7 @@
                     .offset = .{ .x = 1.0, .y = -4.0 },
                     .size = .{ .x = 16, .y = 16 },
                 },
-                .duration = 8.0,
+                .duration = 2.0,
             },
             .growing = .{
                 .sprite = .{
@@ -529,7 +529,7 @@
                     .offset = .{ .x = 0.5, .y = -3.0 },
                     .size = .{ .x = 16, .y = 16 },
                 },
-                .duration = 8.0,
+                .duration = 2.0,
             },
             .mature = .{
                 .sprite = .{
@@ -556,7 +556,7 @@
                     .offset = .{ .x = 2.5, .y = -2.5 },
                     .size = .{ .x = 16, .y = 16 },
                 },
-                .duration = 4.0,
+                .duration = 1.0,
             },
             .sprout = .{
                 .sprite = .{
@@ -568,7 +568,7 @@
                     .offset = .{ .x = 1.0, .y = -4.0 },
                     .size = .{ .x = 16, .y = 16 },
                 },
-                .duration = 6.0,
+                .duration = 2.0,
             },
             .growing = .{
                 .sprite = .{
@@ -580,7 +580,7 @@
                     .offset = .{ .x = 0.5, .y = -3.0 },
                     .size = .{ .x = 16, .y = 16 },
                 },
-                .duration = 6.0,
+                .duration = 2.0,
             },
             .mature = .{
                 .sprite = .{
