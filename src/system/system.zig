@@ -1,4 +1,3 @@
-const zhu = @import("zhu");
 const ecs = @import("ecs");
 
 pub const animation = @import("animation.zig");
@@ -32,7 +31,7 @@ pub fn update(world: *ecs.World, delta: f32) void {
     pickup.update(world, delta);
 
     // 按 F 的处理、相机跟随、动画和排序都读取本帧已结算的位置。
-    interact.update(world);
+    interact.update(world, delta);
     dialog.update(world);
     chest.update(world);
     animation.update(world, delta);

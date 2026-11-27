@@ -74,7 +74,9 @@ pub const actor = struct {
 
     pub const Player = struct {};
     pub const Npc = struct {};
-    pub const Interact = struct {};
+    pub const Interact = struct {
+        pub const Cooldown = struct { timer: zhu.Timer };
+    };
     pub const Animal = AnimalEnum;
     pub const Facing = enum { down, up, left, right };
     pub const Actor = struct {

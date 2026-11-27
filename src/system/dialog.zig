@@ -15,31 +15,24 @@ const Velocity = component.motion.Velocity;
 
 pub fn update(world: *World) void {
     if (world.getIdentity(Dialog)) |target| {
-        checkDistance(world, target);
+        if (!inRange(world, target)) return close(world, target);
         if (zhu.action.pressed(.interact)) advanceDialog(world, target);
         return;
     }
 
     const target = world.getIdentity(Interact) orelse return;
-    if (!world.has(target, Dialog)) return;
-
     startDialog(world, target);
 }
 
-fn checkDistance(world: *World, target: Entity) void {
+fn inRange(world: *World, target: Entity) bool {
     const player = world.getIdentity(Player).?;
     const playerPos = world.get(player, Position).?;
-    const targetPos = world.get(target, Position) orelse {
-        closeDialog(world, target);
-        return;
-    };
-
-    const dist = playerPos.sub(targetPos).length();
-    if (dist > Dialog.closeDist) closeDialog(world, target);
+    const targetPos = world.get(target, Position).?;
+    return playerPos.sub(targetPos).length() <= Dialog.closeDist;
 }
 
 fn startDialog(world: *World, target: Entity) void {
-    const dialog = world.getPtr(target, Dialog).?;
+    const dialog = world.getPtr(target, Dialog) orelse return;
     if (dialog.lines.len == 0) return;
 
     dialog.index = 0;
@@ -73,20 +66,15 @@ fn facingFromDirection(direction: zhu.Vector2) component.actor.Facing {
 }
 
 fn advanceDialog(world: *World, target: Entity) void {
-    const dialog = world.getPtr(target, Dialog) orelse {
-        closeDialog(world, target);
-        return;
-    };
+    const dialog = world.getPtr(target, Dialog).?;
 
     dialog.index += 1;
-    if (dialog.index >= dialog.lines.len) closeDialog(world, target);
+    if (dialog.index >= dialog.lines.len) close(world, target);
 }
 
-fn closeDialog(world: *World, target: Entity) void {
-    const active = world.getIdentity(Dialog) orelse return;
-    if (active != target) return;
-
-    if (world.getPtr(target, Dialog)) |dialog| dialog.index = 0;
+fn close(world: *World, target: Entity) void {
+    world.getPtr(target, Dialog).?.index = 0;
+    world.add(target, Interact.Cooldown{ .timer = .init(0.35) });
     world.removeIdentity(Dialog);
 }
 
@@ -121,7 +109,7 @@ test "dialog 消费交互标记并开始对话" {
     try std.testing.expectEqual(.up, world.get(npc, Actor).?.facing);
 }
 
-test "dialog 对话中按交互键会推进并关闭" {
+test "dialog 连按 F 可以读完对话，结束后才进入冷却" {
     zhu.window.resetInput();
     defer zhu.window.resetInput();
 
@@ -130,17 +118,25 @@ test "dialog 对话中按交互键会推进并关闭" {
 
     _ = addTestPlayer(&world, .xy(0, 0));
     const npc = addTestNpc(&world, .xy(0, 10));
-    world.getPtr(npc, Dialog).?.lines = &.{"你好"};
-    world.setIdentity(npc, Dialog);
+    world.setIdentity(npc, Interact);
+    update(&world);
+    world.removeIdentity(Interact);
 
+    zhu.key.set(.F, true);
+    update(&world);
+    try std.testing.expectEqual(@as(usize, 1), world.get(npc, Dialog).?.index);
+    try std.testing.expect(!world.has(npc, Interact.Cooldown));
+
+    zhu.window.resetInput();
     zhu.key.set(.F, true);
     update(&world);
 
     try std.testing.expectEqual(null, world.getIdentity(Dialog));
     try std.testing.expectEqual(@as(usize, 0), world.get(npc, Dialog).?.index);
+    try std.testing.expect(world.has(npc, Interact.Cooldown));
 }
 
-test "dialog 距离过远会关闭对话" {
+test "dialog 走远会关闭对话并开始冷却" {
     var world = World.init(std.testing.allocator);
     defer world.deinit();
 
@@ -151,4 +147,5 @@ test "dialog 距离过远会关闭对话" {
     update(&world);
 
     try std.testing.expectEqual(null, world.getIdentity(Dialog));
+    try std.testing.expect(world.has(npc, Interact.Cooldown));
 }

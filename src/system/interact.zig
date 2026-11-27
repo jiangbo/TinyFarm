@@ -10,11 +10,19 @@ const Entity = ecs.Entity;
 const Position = component.Position;
 const Player = component.actor.Player;
 const Interact = component.actor.Interact;
+const Cooldown = Interact.Cooldown;
 const Dialog = component.actor.Dialog;
 const Shape = component.motion.Shape;
 const Hit = component.map.Hit;
 
-pub fn update(world: *World) void {
+pub fn update(world: *World, delta: f32) void {
+    var cooldowns = world.query(.{Cooldown}).reverse();
+    while (cooldowns.next()) |row| {
+        const timer = &row.getPtr(Cooldown).timer;
+        if (timer.updateFinished(delta))
+            world.remove(row.entity, Cooldown);
+    }
+
     world.removeIdentity(Interact);
 
     // 对话中按键由 dialog 系统消费，不再重新寻找目标。
@@ -30,7 +38,7 @@ pub fn update(world: *World) void {
     var bestEntity: ?Entity = null;
     var bestDist2: f32 = std.math.inf(f32);
 
-    var query = world.query(.{ Hit, Interact, Position });
+    var query = world.queryNot(.{ Hit, Interact, Position }, .{Cooldown});
     while (query.next()) |row| {
         const pos = targetCenter(world, row.entity);
         const dist2 = playerPos.sub(pos).length2();
@@ -112,11 +120,39 @@ test "interact 按下交互键会给最近目标挂交互标记" {
     const far = addTestNpc(&world, .xy(0, 18));
 
     zhu.key.set(.F, true);
-    update(&world);
+    update(&world, 0);
 
     try std.testing.expectEqual(near, world.getIdentity(Interact).?);
     try std.testing.expect(world.getIdentity(Interact) != far);
     try std.testing.expectEqual(0, world.getComponents(Hit).len);
+}
+
+test "interact 冷却中的 NPC 让位给宝箱，到期后恢复优先选择" {
+    zhu.window.resetInput();
+    defer zhu.window.resetInput();
+
+    var world = World.init(std.testing.allocator);
+    defer world.deinit();
+    world.addResource(testMap);
+
+    _ = addTestPlayer(&world, .xy(0, 0));
+    const npc = addTestNpc(&world, .xy(0, 10));
+    world.add(npc, Cooldown{ .timer = .init(0.35) });
+
+    const chest = world.createEntity();
+    world.add(chest, Position.xy(0, 18));
+    world.add(chest, Shape{ .rect = .init(.xy(-5, -5), .all(10)) });
+    world.add(chest, Interact{});
+    world.add(chest, component.item.Chest{});
+
+    zhu.key.set(.F, true);
+    update(&world, 0.25);
+    try std.testing.expectEqual(chest, world.getIdentity(Interact).?);
+
+    zhu.window.resetInput();
+    zhu.key.set(.F, true);
+    update(&world, 0.10);
+    try std.testing.expectEqual(npc, world.getIdentity(Interact).?);
 }
 
 test "interact 对话中不会重新寻找目标" {
@@ -133,7 +169,7 @@ test "interact 对话中不会重新寻找目标" {
     world.setIdentity(talking, Dialog);
 
     zhu.key.set(.F, true);
-    update(&world);
+    update(&world, 0);
 
     try std.testing.expectEqual(talking, world.getIdentity(Dialog).?);
     try std.testing.expectEqual(null, world.getIdentity(Interact));
@@ -150,7 +186,7 @@ test "interact 下一帧会清理上一次交互目标" {
     const target = world.createEntity();
     world.setIdentity(target, Interact);
 
-    update(&world);
+    update(&world, 0);
 
     try std.testing.expectEqual(null, world.getIdentity(Interact));
 }
