@@ -11,7 +11,7 @@ fn init(allocator: std.mem.Allocator) void {
     zhu.camera.snap = true;
     _ = zhu.loadAtlas(@import("zon/atlas.zon"), .{});
     zhu.batch.init(&commandBuffer, zhu.getImage("circle.png").?);
-    zhu.audio.init(&soundBuffer, .{ .sample_rate = 11025 });
+    zhu.audio.init(&soundBuffer, .{ .sampleRate = 11025 });
 
     var font: zhu.text.static.Font = @import("zon/font.zon");
     font.lineHeight += 2;

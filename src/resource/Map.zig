@@ -15,8 +15,7 @@ const AnimatedTile = struct { vertex: usize, animation: zhu.Animation };
 
 const Soil = struct {
     rules: *const tiled.WangSet,
-    columns: u32,
-    tileSize: zhu.Vector2,
+    set: *const tiled.TileSet,
     image: zhu.Image,
 };
 
@@ -76,17 +75,12 @@ pub fn init(gpa: Allocator, id: component.map.Id, grid: spatial.Grid) Map {
 
 pub fn bindSoil(self: *Map, sets: []const tiled.TileSet) void {
     std.debug.assert(self.soil == null);
-    for (sets) |set| {
+    for (sets) |*set| {
         const rules = set.getWangSet("soil") orelse continue;
         std.debug.assert(set.columns != 0);
         const image = zhu.assets.getImage(set.image) orelse
             zhu.panic("missing soil image {} in atlas", .{set.image});
-        self.soil = .{
-            .rules = rules,
-            .columns = set.columns,
-            .tileSize = set.tileSize,
-            .image = image,
-        };
+        self.soil = .{ .rules = rules, .set = set, .image = image };
         return;
     }
     @panic("soil terrain rules are missing from maps/tileSet");
@@ -119,10 +113,8 @@ pub fn updateGround(self: *Map, gpa: Allocator) void {
         const layers: usize = if (ground == .wet) 2 else 1;
         for (0..layers) |layer| {
             const id = groundTileId(self, index, layer == 1);
-            const col: f32 = @floatFromInt(id % soil.columns);
-            const row: f32 = @floatFromInt(id / soil.columns);
-            const offset = zhu.Vector2.xy(col, row).mul(soil.tileSize);
-            const image = soil.image.sub(.init(offset, soil.tileSize));
+            const offset = soil.set.tileOffset(id);
+            const image = soil.image.sub(.init(offset, soil.set.tileSize));
             self.groundVertexes.append(gpa, .{
                 .position = position,
                 .layer = image.layer,
@@ -214,8 +206,14 @@ const testSoil: Soil = .{
             .{ .tileId = 60, .colors = .{ 2, 0, 0, 0, 0, 0, 0, 0 } },
         },
     },
-    .columns = 24,
-    .tileSize = .all(16),
+    .set = &.{
+        .id = 0,
+        .columns = 24,
+        .tileCount = 192,
+        .image = 0,
+        .tileSize = .all(16),
+        .tiles = &.{},
+    },
     .image = .{ .size = .xy(384, 128) },
 };
 
